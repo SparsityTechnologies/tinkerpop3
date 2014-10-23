@@ -11,10 +11,10 @@ import java.io.IOException;
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class RuleWritable implements Writable {
+public final class RuleWritable implements Writable {
 
     public enum Rule {
-        OR, AND, INCR, SET, NO_OP;
+        OR, AND, INCR, SET, NO_OP
     }
 
     private Rule rule;

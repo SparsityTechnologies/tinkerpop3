@@ -3,7 +3,7 @@ package com.tinkerpop.gremlin.neo4j.structure;
 import com.tinkerpop.gremlin.neo4j.process.graph.Neo4jTraversal;
 import com.tinkerpop.gremlin.neo4j.process.graph.step.sideEffect.Neo4jGraphStep;
 import com.tinkerpop.gremlin.neo4j.process.graph.step.util.Neo4jCypherIterator;
-import com.tinkerpop.gremlin.neo4j.process.graph.util.DefaultNeo4jTraversal;
+import com.tinkerpop.gremlin.neo4j.process.graph.util.Neo4jGraphTraversal;
 import com.tinkerpop.gremlin.process.computer.GraphComputer;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.StartStep;
 import com.tinkerpop.gremlin.structure.Edge;
@@ -19,14 +19,13 @@ import org.apache.commons.configuration.ConfigurationConverter;
 import org.neo4j.cypher.javacompat.ExecutionEngine;
 import org.neo4j.graphdb.DynamicLabel;
 import org.neo4j.graphdb.GraphDatabaseService;
+import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.NotFoundException;
 import org.neo4j.graphdb.NotInTransactionException;
-import org.neo4j.graphdb.PropertyContainer;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.graphdb.factory.HighlyAvailableGraphDatabaseFactory;
 import org.neo4j.graphdb.schema.Schema;
 import org.neo4j.kernel.GraphDatabaseAPI;
-import org.neo4j.kernel.impl.core.NodeManager;
 
 import javax.transaction.Status;
 import javax.transaction.SystemException;
@@ -43,26 +42,51 @@ import java.util.function.Function;
  */
 @Graph.OptIn(Graph.OptIn.SUITE_STRUCTURE_STANDARD)
 @Graph.OptIn(Graph.OptIn.SUITE_PROCESS_STANDARD)
-@Graph.OptOut(
-        test = "com.tinkerpop.gremlin.process.graph.step.map.MatchTest$JavaMatchTest",
-        method = "g_V_matchXa_0sungBy_b__a_0writtenBy_c__b_writtenBy_d__c_sungBy_d__d_hasXname_GarciaXX",
-        reason = "This is returning one matched binding that is wrong. This needs to be fixed.")
 public class Neo4jGraph implements Graph, WrappedGraph<GraphDatabaseService> {
     private GraphDatabaseService baseGraph;
 
     public static final String CONFIG_DIRECTORY = "gremlin.neo4j.directory";
-    private static final String CONFIG_HA = "gremlin.neo4j.ha";
-    private static final String CONFIG_CONF = "gremlin.neo4j.conf";
+    public static final String CONFIG_HA = "gremlin.neo4j.ha";
+    public static final String CONFIG_CONF = "gremlin.neo4j.conf";
+    public static final String CONFIG_META_PROPERTIES = "gremlin.neo4j.metaProperties";
+    public static final String CONFIG_MULTI_PROPERTIES = "gremlin.neo4j.multiProperties";
 
     private final Neo4jTransaction neo4jTransaction = new Neo4jTransaction();
+    private final Neo4jGraphVariables neo4jGraphVariables;
+
+    protected final boolean supportsMetaProperties;
+    protected final boolean supportsMultiProperties;
 
     protected final TransactionManager transactionManager;
     private final ExecutionEngine cypher;
 
     private Neo4jGraph(final GraphDatabaseService baseGraph) {
         this.baseGraph = baseGraph;
-        transactionManager = ((GraphDatabaseAPI) baseGraph).getDependencyResolver().resolveDependency(TransactionManager.class);
-        cypher = new ExecutionEngine(baseGraph);
+        this.transactionManager = ((GraphDatabaseAPI) baseGraph).getDependencyResolver().resolveDependency(TransactionManager.class);
+        this.cypher = new ExecutionEngine(this.baseGraph);
+        this.neo4jGraphVariables = new Neo4jGraphVariables(this);
+
+        ///////////
+        final Optional<Boolean> metaProperties = this.neo4jGraphVariables.get(Graph.System.system(CONFIG_META_PROPERTIES));
+        if (metaProperties.isPresent()) {
+            this.supportsMetaProperties = metaProperties.get();
+        } else {
+            this.supportsMetaProperties = false;
+            this.neo4jGraphVariables.set(Graph.System.system(CONFIG_META_PROPERTIES), false);
+        }
+        final Optional<Boolean> multiProperties = this.neo4jGraphVariables.get(Graph.System.system(CONFIG_MULTI_PROPERTIES));
+        if (multiProperties.isPresent()) {
+            this.supportsMultiProperties = multiProperties.get();
+        } else {
+            this.supportsMultiProperties = false;
+            this.neo4jGraphVariables.set(Graph.System.system(CONFIG_MULTI_PROPERTIES), false);
+        }
+        if ((this.supportsMetaProperties && !this.supportsMultiProperties) || (!this.supportsMetaProperties && this.supportsMultiProperties)) {
+            tx().rollback();
+            throw new UnsupportedOperationException("Neo4jGraph currently requires either both meta- and multi-properties activated or neither activated");
+        }
+        tx().commit();
+        ///////////
     }
 
     private Neo4jGraph(final Configuration configuration) {
@@ -70,15 +94,29 @@ public class Neo4jGraph implements Graph, WrappedGraph<GraphDatabaseService> {
             final String directory = configuration.getString(CONFIG_DIRECTORY);
             final Map neo4jSpecificConfig = ConfigurationConverter.getMap(configuration.subset(CONFIG_CONF));
             final boolean ha = configuration.getBoolean(CONFIG_HA, false);
-
             // if HA is enabled then use the correct factory to instantiate the GraphDatabaseService
             this.baseGraph = ha ?
                     new HighlyAvailableGraphDatabaseFactory().newHighlyAvailableDatabaseBuilder(directory).setConfig(neo4jSpecificConfig).newGraphDatabase() :
                     new GraphDatabaseFactory().newEmbeddedDatabaseBuilder(directory).
                             setConfig(neo4jSpecificConfig).newGraphDatabase();
-            transactionManager = ((GraphDatabaseAPI) baseGraph).getDependencyResolver().resolveDependency(TransactionManager.class);
-            cypher = new ExecutionEngine(baseGraph);
-
+            this.transactionManager = ((GraphDatabaseAPI) this.baseGraph).getDependencyResolver().resolveDependency(TransactionManager.class);
+            this.cypher = new ExecutionEngine(this.baseGraph);
+            this.neo4jGraphVariables = new Neo4jGraphVariables(this);
+            ///////////
+            if (!this.neo4jGraphVariables.get(Graph.System.system(CONFIG_META_PROPERTIES)).isPresent())
+                this.neo4jGraphVariables.set(Graph.System.system(CONFIG_META_PROPERTIES), configuration.getBoolean(CONFIG_META_PROPERTIES, false));
+            // TODO: Logger saying the configuration properties are ignored if already in Graph.Variables
+            if (!this.neo4jGraphVariables.get(Graph.System.system(CONFIG_MULTI_PROPERTIES)).isPresent())
+                this.neo4jGraphVariables.set(Graph.System.system(CONFIG_MULTI_PROPERTIES), configuration.getBoolean(CONFIG_MULTI_PROPERTIES, false));
+            // TODO: Logger saying the configuration properties are ignored if already in Graph.Variables
+            this.supportsMetaProperties = this.neo4jGraphVariables.<Boolean>get(Graph.System.system(CONFIG_META_PROPERTIES)).get();
+            this.supportsMultiProperties = this.neo4jGraphVariables.<Boolean>get(Graph.System.system(CONFIG_MULTI_PROPERTIES)).get();
+            if ((this.supportsMetaProperties && !this.supportsMultiProperties) || (!this.supportsMetaProperties && this.supportsMultiProperties)) {
+                tx().rollback();
+                throw new UnsupportedOperationException("Neo4jGraph currently requires either both meta- and multi-properties activated or neither activated");
+            }
+            tx().commit();
+            ///////////
         } catch (Exception e) {
             if (this.baseGraph != null)
                 this.baseGraph.shutdown();
@@ -90,22 +128,21 @@ public class Neo4jGraph implements Graph, WrappedGraph<GraphDatabaseService> {
      * Open a new {@link Neo4jGraph} instance.
      *
      * @param configuration the configuration for the instance
-     * @param <G>           the {@link com.tinkerpop.gremlin.structure.Graph} instance
      * @return a newly opened {@link com.tinkerpop.gremlin.structure.Graph}
      */
-    public static <G extends Graph> G open(final Configuration configuration) {
+    public static Neo4jGraph open(final Configuration configuration) {
         if (null == configuration) throw Graph.Exceptions.argumentCanNotBeNull("configuration");
 
         if (!configuration.containsKey(CONFIG_DIRECTORY))
             throw new IllegalArgumentException(String.format("Neo4j configuration requires that the %s be set", CONFIG_DIRECTORY));
 
-        return (G) new Neo4jGraph(configuration);
+        return new Neo4jGraph(configuration);
     }
 
     /**
      * Construct a Neo4jGraph instance by specifying the directory to create the database in..
      */
-    public static <G extends Graph> G open(final String directory) {
+    public static Neo4jGraph open(final String directory) {
         final Configuration config = new BaseConfiguration();
         config.setProperty(CONFIG_DIRECTORY, directory);
         return open(config);
@@ -114,8 +151,8 @@ public class Neo4jGraph implements Graph, WrappedGraph<GraphDatabaseService> {
     /**
      * Construct a Neo4jGraph instance using an existing Neo4j raw instance.
      */
-    public static <G extends Graph> G open(final GraphDatabaseService rawGraph) {
-        return (G) new Neo4jGraph(Optional.ofNullable(rawGraph).orElseThrow(() -> Graph.Exceptions.argumentCanNotBeNull("baseGraph")));
+    public static Neo4jGraph open(final GraphDatabaseService rawGraph) {
+        return new Neo4jGraph(Optional.ofNullable(rawGraph).orElseThrow(() -> Graph.Exceptions.argumentCanNotBeNull("baseGraph")));
     }
 
     @Override
@@ -135,7 +172,7 @@ public class Neo4jGraph implements Graph, WrappedGraph<GraphDatabaseService> {
     @Override
     public Neo4jTraversal<Vertex, Vertex> V() {
         this.tx().readWrite();
-        final Neo4jTraversal<Vertex, Vertex> traversal = new DefaultNeo4jTraversal<>(this);
+        final Neo4jTraversal<Vertex, Vertex> traversal = new Neo4jGraphTraversal<>(this);
         traversal.addStep(new Neo4jGraphStep(traversal, Vertex.class, this));
         return traversal;
     }
@@ -143,7 +180,7 @@ public class Neo4jGraph implements Graph, WrappedGraph<GraphDatabaseService> {
     @Override
     public Neo4jTraversal<Edge, Edge> E() {
         this.tx().readWrite();
-        final Neo4jTraversal<Edge, Edge> traversal = new DefaultNeo4jTraversal<>(this);
+        final Neo4jTraversal<Edge, Edge> traversal = new Neo4jGraphTraversal<>(this);
         traversal.addStep(new Neo4jGraphStep(traversal, Edge.class, this));
         return traversal;
     }
@@ -154,7 +191,9 @@ public class Neo4jGraph implements Graph, WrappedGraph<GraphDatabaseService> {
         if (null == id) throw Graph.Exceptions.elementNotFound(Vertex.class, id);
 
         try {
-            return new Neo4jVertex(this.baseGraph.getNodeById(evaluateToLong(id)), this);
+            final Node node = this.baseGraph.getNodeById(evaluateToLong(id));
+            if (!node.hasLabel(Neo4jVertexProperty.VERTEX_PROPERTY_LABEL))
+                return new Neo4jVertex(node, this);
         } catch (final NotFoundException e) {
             throw Graph.Exceptions.elementNotFound(Vertex.class, id);
         } catch (final NumberFormatException e) {
@@ -162,6 +201,7 @@ public class Neo4jGraph implements Graph, WrappedGraph<GraphDatabaseService> {
         } catch (final NotInTransactionException e) {
             throw Graph.Exceptions.elementNotFound(Vertex.class, id);
         }
+        throw Graph.Exceptions.elementNotFound(Vertex.class, id);
     }
 
     @Override
@@ -199,7 +239,7 @@ public class Neo4jGraph implements Graph, WrappedGraph<GraphDatabaseService> {
 
     @Override
     public Variables variables() {
-        throw Graph.Exceptions.variablesNotSupported();
+        return this.neo4jGraphVariables;
     }
 
     /**
@@ -243,10 +283,6 @@ public class Neo4jGraph implements Graph, WrappedGraph<GraphDatabaseService> {
         final Neo4jTraversal traversal = Neo4jTraversal.of(this);
         traversal.addStep(new StartStep(traversal, new Neo4jCypherIterator(this.cypher.execute(query, parameters).iterator(), this)));
         return traversal;
-    }
-
-    private PropertyContainer getGraphProperties() {
-        return ((GraphDatabaseAPI) this.baseGraph).getDependencyResolver().resolveDependency(NodeManager.class).getGraphProperties();
     }
 
     private static Long evaluateToLong(final Object id) throws NumberFormatException {
@@ -352,7 +388,7 @@ public class Neo4jGraph implements Graph, WrappedGraph<GraphDatabaseService> {
         }
     }
 
-    public static class Neo4jGraphFeatures implements Features {
+    public class Neo4jGraphFeatures implements Features {
         @Override
         public GraphFeatures graph() {
             return new GraphFeatures() {
@@ -363,7 +399,7 @@ public class Neo4jGraph implements Graph, WrappedGraph<GraphDatabaseService> {
 
                 @Override
                 public VariableFeatures variables() {
-                    return new Neo4jVariableFeatures();
+                    return new Neo4jGraphVariables.Neo4jVariableFeatures();
                 }
 
                 @Override
@@ -388,21 +424,31 @@ public class Neo4jGraph implements Graph, WrappedGraph<GraphDatabaseService> {
             return StringFactory.featureString(this);
         }
 
-        public static class Neo4jVertexFeatures extends Neo4jElementFeatures implements VertexFeatures {
+        public class Neo4jVertexFeatures extends Neo4jElementFeatures implements VertexFeatures {
             @Override
             public VertexPropertyFeatures properties() {
                 return new Neo4jVertexPropertyFeatures();
             }
+
+            @Override
+            public boolean supportsMetaProperties() {
+                return Neo4jGraph.this.supportsMetaProperties;
+            }
+
+            @Override
+            public boolean supportsMultiProperties() {
+                return Neo4jGraph.this.supportsMultiProperties;
+            }
         }
 
-        public static class Neo4jEdgeFeatures extends Neo4jElementFeatures implements EdgeFeatures {
+        public class Neo4jEdgeFeatures extends Neo4jElementFeatures implements EdgeFeatures {
             @Override
             public EdgePropertyFeatures properties() {
                 return new Neo4jEdgePropertyFeatures();
             }
         }
 
-        public static class Neo4jElementFeatures implements ElementFeatures {
+        public class Neo4jElementFeatures implements ElementFeatures {
             @Override
             public boolean supportsUserSuppliedIds() {
                 return false;
@@ -429,7 +475,7 @@ public class Neo4jGraph implements Graph, WrappedGraph<GraphDatabaseService> {
             }
         }
 
-        public static class Neo4jVertexPropertyFeatures implements VertexPropertyFeatures {
+        public class Neo4jVertexPropertyFeatures implements VertexPropertyFeatures {
             @Override
             public boolean supportsMapValues() {
                 return false;
@@ -449,9 +495,14 @@ public class Neo4jGraph implements Graph, WrappedGraph<GraphDatabaseService> {
             public boolean supportsUniformListValues() {
                 return false;
             }
+
+            @Override
+            public boolean supportsUserSuppliedIds() {
+                return false;
+            }
         }
 
-        public static class Neo4jEdgePropertyFeatures implements EdgePropertyFeatures {
+        public class Neo4jEdgePropertyFeatures implements EdgePropertyFeatures {
             @Override
             public boolean supportsMapValues() {
                 return false;
@@ -464,98 +515,6 @@ public class Neo4jGraph implements Graph, WrappedGraph<GraphDatabaseService> {
 
             @Override
             public boolean supportsSerializableValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsUniformListValues() {
-                return false;
-            }
-        }
-
-        public static class Neo4jVariableFeatures implements VariableFeatures {
-            @Override
-            public boolean supportsBooleanValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsDoubleValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsFloatValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsIntegerValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsLongValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsMapValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsMixedListValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsByteValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsBooleanArrayValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsByteArrayValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsDoubleArrayValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsFloatArrayValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsIntegerArrayValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsLongArrayValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsStringArrayValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsSerializableValues() {
-                return false;
-            }
-
-            @Override
-            public boolean supportsStringValues() {
                 return false;
             }
 

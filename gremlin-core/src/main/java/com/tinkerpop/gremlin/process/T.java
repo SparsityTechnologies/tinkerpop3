@@ -1,8 +1,6 @@
 package com.tinkerpop.gremlin.process;
 
-import com.tinkerpop.gremlin.structure.Compare;
-import com.tinkerpop.gremlin.structure.Contains;
-import com.tinkerpop.gremlin.util.function.SBiPredicate;
+import com.tinkerpop.gremlin.structure.Graph;
 
 /**
  * A collection of (T)okens which allows for more concise Traversal definitions.
@@ -11,66 +9,47 @@ import com.tinkerpop.gremlin.util.function.SBiPredicate;
  */
 public enum T {
     /**
-     * Greater than
+     * Label (representing Element.label())
      */
-    gt,
+    label {
+        @Override
+        public String getAccessor() {
+            return LABEL;
+        }
+    },
     /**
-     * Less than
+     * Id (representing Element.id())
      */
-    lt,
+    id {
+        @Override
+        public String getAccessor() {
+            return ID;
+        }
+    },
     /**
-     * Equal to
+     * Key (representing Property.key())
      */
-    eq,
+    key {
+        @Override
+        public String getAccessor() {
+            return KEY;
+        }
+    },
     /**
-     * Greater than or equal to
+     * Value (representing Property.value())
      */
-    gte,
-    /**
-     * Less than or equal to
-     */
-    lte,
-    /**
-     * Not equal to
-     */
-    neq,
-    /**
-     * Decrement
-     */
-    decr,
-    /**
-     * Increment
-     */
-    incr,
-    /**
-     * In collection
-     */
-    in,
-    /**
-     * Not in collection
-     */
-    nin;
+    value {
+        @Override
+        public String getAccessor() {
+            return VALUE;
+        }
+    };
 
+    private static final String LABEL = Graph.System.system("label");
+    private static final String ID = Graph.System.system("id");
+    private static final String KEY = Graph.System.system("key");
+    private static final String VALUE = Graph.System.system("value");
 
-    public static SBiPredicate convert(final T t) {
-        if (t.equals(T.eq))
-            return Compare.EQUAL;
-        else if (t.equals(T.neq))
-            return Compare.NOT_EQUAL;
-        else if (t.equals(T.lt))
-            return Compare.LESS_THAN;
-        else if (t.equals(T.lte))
-            return Compare.LESS_THAN_EQUAL;
-        else if (t.equals(T.gt))
-            return Compare.GREATER_THAN;
-        else if (t.equals(T.gte))
-            return Compare.GREATER_THAN_EQUAL;
-        else if (t.equals(T.in))
-            return Contains.IN;
-        else if (t.equals(T.nin))
-            return Contains.NOT_IN;
-        else
-            throw new IllegalArgumentException(t.toString() + " is an unknown filter type");
-    }
+    public abstract String getAccessor();
 
 }

@@ -1,11 +1,18 @@
 package com.tinkerpop.gremlin.structure.util;
 
+import com.tinkerpop.gremlin.process.Traversal;
+import com.tinkerpop.gremlin.process.TraversalStrategy;
 import com.tinkerpop.gremlin.process.computer.GraphComputer;
+import com.tinkerpop.gremlin.process.computer.MapReduce;
 import com.tinkerpop.gremlin.process.computer.Memory;
+import com.tinkerpop.gremlin.process.computer.VertexProgram;
+import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.VertexProperty;
+import com.tinkerpop.gremlin.structure.strategy.GraphStrategy;
 import com.tinkerpop.gremlin.util.function.FunctionUtils;
 import org.javatuples.Pair;
 
@@ -27,6 +34,7 @@ public class StringFactory {
     private static final String V = "v";
     private static final String E = "e";
     private static final String P = "p";
+    private static final String VP = "vp";
     private static final String L_BRACKET = "[";
     private static final String R_BRACKET = "]";
     private static final String COMMA_SPACE = ", ";
@@ -36,6 +44,7 @@ public class StringFactory {
     private static final String DASH = "-";
     private static final String ARROW = "->";
     private static final String EMPTY_PROPERTY = "p[empty]";
+    private static final String EMPTY_VERTEX_PROPERTY = "vp[empty]";
     private static final String LINE_SEPARATOR = System.getProperty("line.separator");
 
     private static final String featuresStartWith = "supports";
@@ -52,14 +61,21 @@ public class StringFactory {
      * Construct the representation for a {@link com.tinkerpop.gremlin.structure.Edge}.
      */
     public static String edgeString(final Edge edge) {
-        return E + L_BRACKET + edge.id() + R_BRACKET + L_BRACKET + edge.outV().next().id() + DASH + edge.label() + ARROW + edge.inV().next().id() + R_BRACKET;
+        final Vertex inV = edge.iterators().vertexIterator(Direction.IN).next();
+        final Vertex outV = edge.iterators().vertexIterator(Direction.OUT).next();
+        return E + L_BRACKET + edge.id() + R_BRACKET + L_BRACKET + outV.id() + DASH + edge.label() + ARROW + inV.id() + R_BRACKET;
     }
 
     /**
-     * Construct the representation for a {@link com.tinkerpop.gremlin.structure.Property}.
+     * Construct the representation for a {@link com.tinkerpop.gremlin.structure.Property} or {@link com.tinkerpop.gremlin.structure.VertexProperty}.
      */
     public static String propertyString(final Property property) {
-        return property.isPresent() ? P + L_BRACKET + property.key() + ARROW + property.value() + R_BRACKET : EMPTY_PROPERTY;
+        final String valueString = String.valueOf(property.value());
+        if (property instanceof VertexProperty) {
+            return property.isPresent() ? VP + L_BRACKET + property.key() + ARROW + valueString.substring(0, Math.min(valueString.length(), 20)) + R_BRACKET : EMPTY_VERTEX_PROPERTY;
+        } else {
+            return property.isPresent() ? P + L_BRACKET + property.key() + ARROW + valueString.substring(0, Math.min(valueString.length(), 20)) + R_BRACKET : EMPTY_PROPERTY;
+        }
     }
 
     /**
@@ -71,15 +87,34 @@ public class StringFactory {
         return graph.getClass().getSimpleName().toLowerCase() + L_BRACKET + internalString + R_BRACKET;
     }
 
+    /**
+     * Construct the representation for a {@link com.tinkerpop.gremlin.structure.strategy.GraphStrategy}.
+     */
+    public static String graphStrategyString(final GraphStrategy graphStrategy, final Graph graph) {
+        return graphStrategy.getClass().getSimpleName().toLowerCase() + L_BRACKET + graph.toString() + R_BRACKET;
+    }
+
+    public static String graphStrategyVertexString(final GraphStrategy graphStrategy, final Vertex vertex) {
+        return graphStrategy + L_BRACKET + vertex.toString() + R_BRACKET;
+    }
+
+    public static String graphStrategyEdgeString(final GraphStrategy graphStrategy, final Edge edge) {
+        return graphStrategy + L_BRACKET + edge.toString() + R_BRACKET;
+    }
+
+    public static String graphStrategyPropertyString(final GraphStrategy graphStrategy, final Property property) {
+        return graphStrategy + L_BRACKET + property.toString() + R_BRACKET;
+    }
+
     public static String graphVariablesString(final Graph.Variables variables) {
         return "variables" + L_BRACKET + "size:" + variables.keys().size() + R_BRACKET;
     }
 
-    public static String computeMemoryString(final Memory memory) {
+    public static String memoryString(final Memory memory) {
         return "memory" + L_BRACKET + "size:" + memory.keys().size() + R_BRACKET;
     }
 
-    public static String computerString(final GraphComputer graphComputer) {
+    public static String graphComputerString(final GraphComputer graphComputer) {
         return graphComputer.getClass().getSimpleName().toLowerCase();
     }
 
@@ -102,6 +137,26 @@ public class StringFactory {
         });
 
         return sb.toString();
+    }
+
+    public static String traversalSideEffectsString(final Traversal.SideEffects traversalSideEffects) {
+        return "sideEffects" + L_BRACKET + "size:" + traversalSideEffects.keys().size() + R_BRACKET;
+    }
+
+    public static String traversalStrategiesString(final Traversal.Strategies traversalStrategies) {
+        return "strategies" + traversalStrategies.toList();
+    }
+
+    public static String traversalStrategyString(final TraversalStrategy traversalStrategy) {
+        return traversalStrategy.getClass().getSimpleName();
+    }
+
+    public static String vertexProgramString(final VertexProgram vertexProgram, final String internalString) {
+        return vertexProgram.getClass().getSimpleName() + L_BRACKET + internalString + R_BRACKET;
+    }
+
+    public static String mapReduceString(final MapReduce mapReduce, final String internalString) {
+        return mapReduce.getClass().getSimpleName() + L_BRACKET + internalString + R_BRACKET;
     }
 
     private static Function<Method, String> createTransform(final Graph.Features.FeatureSet features) {

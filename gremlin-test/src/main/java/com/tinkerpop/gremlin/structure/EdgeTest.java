@@ -3,29 +3,23 @@ package com.tinkerpop.gremlin.structure;
 import com.tinkerpop.gremlin.AbstractGremlinTest;
 import com.tinkerpop.gremlin.ExceptionCoverage;
 import com.tinkerpop.gremlin.FeatureRequirement;
-import com.tinkerpop.gremlin.FeatureRequirementSet;
 import com.tinkerpop.gremlin.structure.util.StringFactory;
 import org.junit.Test;
 
-import java.util.Map;
+import java.util.List;
 import java.util.Set;
 
-import static com.tinkerpop.gremlin.structure.Graph.Features.PropertyFeatures.FEATURE_BOOLEAN_VALUES;
-import static com.tinkerpop.gremlin.structure.Graph.Features.PropertyFeatures.FEATURE_DOUBLE_VALUES;
-import static com.tinkerpop.gremlin.structure.Graph.Features.PropertyFeatures.FEATURE_FLOAT_VALUES;
-import static com.tinkerpop.gremlin.structure.Graph.Features.PropertyFeatures.FEATURE_INTEGER_VALUES;
-import static com.tinkerpop.gremlin.structure.Graph.Features.PropertyFeatures.FEATURE_LONG_VALUES;
-import static com.tinkerpop.gremlin.structure.Graph.Features.PropertyFeatures.FEATURE_STRING_VALUES;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static com.tinkerpop.gremlin.structure.Graph.Features.PropertyFeatures.*;
+import static org.junit.Assert.*;
 
 /**
  * @author Stephen Mallette (http://stephen.genoprime.com)
+ * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-@ExceptionCoverage(exceptionClass = Edge.Exceptions.class, methods = {
-        "edgeLabelCanNotBeNull"
+@ExceptionCoverage(exceptionClass = Element.Exceptions.class, methods = {
+        "labelCanNotBeNull",
+        "labelCanNotBeEmpty",
+        "labelCanNotBeASystemKey"
 })
 public class EdgeTest extends AbstractGremlinTest {
     @Test
@@ -48,7 +42,38 @@ public class EdgeTest extends AbstractGremlinTest {
             v.addEdge(null, v);
             fail("Call to Vertex.addEdge() should throw an exception when label is null");
         } catch (Exception ex) {
-            final Exception expectedException = Edge.Exceptions.edgeLabelCanNotBeNull();
+            final Exception expectedException = Element.Exceptions.labelCanNotBeNull();
+            assertEquals(expectedException.getClass(), ex.getClass());
+            assertEquals(expectedException.getMessage(), ex.getMessage());
+        }
+    }
+
+    @Test
+    @FeatureRequirement(featureClass = Graph.Features.EdgeFeatures.class, feature = Graph.Features.EdgeFeatures.FEATURE_ADD_EDGES)
+    @FeatureRequirement(featureClass = Graph.Features.VertexFeatures.class, feature = Graph.Features.VertexFeatures.FEATURE_ADD_VERTICES)
+    public void shouldHaveExceptionConsistencyWhenUsingEmptyVertexLabel() {
+        final Vertex v = g.addVertex();
+        try {
+            v.addEdge("", v);
+            fail("Call to Vertex.addEdge() should throw an exception when label is empty");
+        } catch (Exception ex) {
+            final Exception expectedException = Element.Exceptions.labelCanNotBeEmpty();
+            assertEquals(expectedException.getClass(), ex.getClass());
+            assertEquals(expectedException.getMessage(), ex.getMessage());
+        }
+    }
+
+    @Test
+    @FeatureRequirement(featureClass = Graph.Features.EdgeFeatures.class, feature = Graph.Features.EdgeFeatures.FEATURE_ADD_EDGES)
+    @FeatureRequirement(featureClass = Graph.Features.VertexFeatures.class, feature = Graph.Features.VertexFeatures.FEATURE_ADD_VERTICES)
+    public void shouldHaveExceptionConsistencyWhenUsingSystemVertexLabel() {
+        final String label = Graph.System.system("systemLabel");
+        final Vertex v = g.addVertex();
+        try {
+            v.addEdge(label, v);
+            fail("Call to Vertex.addEdge() should throw an exception when label is a system key");
+        } catch (Exception ex) {
+            final Exception expectedException = Element.Exceptions.labelCanNotBeASystemKey(label);
             assertEquals(expectedException.getClass(), ex.getClass());
             assertEquals(expectedException.getMessage(), ex.getMessage());
         }
@@ -141,14 +166,14 @@ public class EdgeTest extends AbstractGremlinTest {
         assertTrue(keys.contains("location"));
         assertTrue(keys.contains("status"));
 
-        final Map<String, Property> m = e.properties();
+        final List<Property<Object>> m = e.properties().toList();
         assertEquals(3, m.size());
-        assertEquals("name", m.get("name").key());
-        assertEquals("location", m.get("location").key());
-        assertEquals("status", m.get("status").key());
-        assertEquals("marko", m.get("name").orElse(""));
-        assertEquals("desert", m.get("location").orElse(""));
-        assertEquals("dope", m.get("status").orElse(""));
+        assertTrue(m.stream().anyMatch(p -> p.key().equals("name")));
+        assertTrue(m.stream().anyMatch(p -> p.key().equals("location")));
+        assertTrue(m.stream().anyMatch(p -> p.key().equals("status")));
+        assertEquals("marko", m.stream().filter(p -> p.key().equals("name")).map(Property::value).findAny().orElse(null));
+        assertEquals("desert", m.stream().filter(p -> p.key().equals("location")).map(Property::value).findAny().orElse(null));
+        assertEquals("dope", m.stream().filter(p -> p.key().equals("status")).map(Property::value).findAny().orElse(null));
 
         e.property("status").remove();
 
@@ -157,7 +182,7 @@ public class EdgeTest extends AbstractGremlinTest {
         assertTrue(keys.contains("name"));
         assertTrue(keys.contains("location"));
 
-        e.properties().values().stream().forEach(p -> p.remove());
+        e.properties().remove();
 
         keys = e.keys();
         assertEquals(0, keys.size());
@@ -165,6 +190,7 @@ public class EdgeTest extends AbstractGremlinTest {
 
     @Test
     @FeatureRequirement(featureClass = Graph.Features.EdgeFeatures.class, feature = Graph.Features.EdgeFeatures.FEATURE_ADD_EDGES)
+    @FeatureRequirement(featureClass = Graph.Features.EdgeFeatures.class, feature = Graph.Features.EdgeFeatures.FEATURE_REMOVE_EDGES)
     @FeatureRequirement(featureClass = Graph.Features.VertexFeatures.class, feature = Graph.Features.VertexFeatures.FEATURE_ADD_VERTICES)
     public void shouldNotGetConcurrentModificationException() {
         for (int i = 0; i < 25; i++) {
@@ -172,36 +198,34 @@ public class EdgeTest extends AbstractGremlinTest {
             v.addEdge("friend", v);
         }
 
-        tryCommit(g, StructureStandardSuite.assertVertexEdgeCounts(25, 25));
+        tryCommit(g, assertVertexEdgeCounts(25, 25));
 
         for (Edge e : g.E().toList()) {
             e.remove();
             tryCommit(g);
         }
 
-        tryCommit(g, StructureStandardSuite.assertVertexEdgeCounts(25, 0));
+        tryCommit(g, assertVertexEdgeCounts(25, 0));
     }
 
     @Test
     @FeatureRequirement(featureClass = Graph.Features.EdgeFeatures.class, feature = Graph.Features.EdgeFeatures.FEATURE_ADD_EDGES)
     @FeatureRequirement(featureClass = Graph.Features.VertexFeatures.class, feature = Graph.Features.VertexFeatures.FEATURE_ADD_VERTICES)
-    public void shouldReturnEmptyMapIfNoProperties() {
+    public void shouldReturnEmptyIteratorIfNoProperties() {
         final Vertex v = g.addVertex();
         final Edge e = v.addEdge("knows", v);
-        final Map<String, Property> m = e.properties();
-        assertNotNull(m);
-        assertEquals(0, m.size());
+        assertEquals(0, e.properties().count().next().intValue());
     }
-
 
     @Test
     @FeatureRequirement(featureClass = Graph.Features.EdgeFeatures.class, feature = Graph.Features.EdgeFeatures.FEATURE_ADD_EDGES)
     @FeatureRequirement(featureClass = Graph.Features.VertexFeatures.class, feature = Graph.Features.VertexFeatures.FEATURE_ADD_VERTICES)
+    @FeatureRequirement(featureClass = Graph.Features.EdgeFeatures.class, feature = Graph.Features.EdgeFeatures.FEATURE_REMOVE_EDGES)
     public void shouldSupportIdempotentRemoval() {
-        final Vertex v1 =g.addVertex();
-        final Vertex v2 =g.addVertex();
+        final Vertex v1 = g.addVertex();
+        final Vertex v2 = g.addVertex();
         final Edge e = v1.addEdge("test", v2);
-        tryCommit(g, StructureStandardSuite.assertVertexEdgeCounts(2, 1));
+        tryCommit(g, assertVertexEdgeCounts(2, 1));
 
         e.remove();
         e.remove();
@@ -217,7 +241,17 @@ public class EdgeTest extends AbstractGremlinTest {
             e.remove();
             tryCommit(g);
         } finally {
-            StructureStandardSuite.assertVertexEdgeCounts(0, 0);
+            assertVertexEdgeCounts(0, 0);
         }
+    }
+
+    @Test
+    @FeatureRequirement(featureClass = Graph.Features.VertexFeatures.class, feature = Graph.Features.VertexFeatures.FEATURE_ADD_VERTICES)
+    @FeatureRequirement(featureClass = Graph.Features.VertexFeatures.class, feature = Graph.Features.VertexFeatures.FEATURE_REMOVE_VERTICES)
+    public void shouldReturnEmptyPropertyIfEdgeWasRemoved() {
+        final Vertex v1 = g.addVertex("name", "stephen");
+        final Edge e = v1.addEdge("knows", v1, "x", "y");
+        e.remove();
+        tryCommit(g, g -> assertEquals(Property.empty(), e.property("x")));
     }
 }

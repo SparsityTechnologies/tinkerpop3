@@ -9,15 +9,24 @@ import java.util.Iterator;
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class EmptyStep<S, E> implements Step<S, E> {
+public final class EmptyStep<S, E> implements Step<S, E> {
 
-    private static final Step INSTANCE = new EmptyStep<>();
+    private static final EmptyStep INSTANCE = new EmptyStep<>();
+
+    public static <S, E> Step<S, E> instance() {
+        return INSTANCE;
+    }
 
     private EmptyStep() {
     }
 
     @Override
-    public void addStarts(final Iterator<Traverser<S>> iterator) {
+    public void addStarts(final Iterator<Traverser<S>> starts) {
+
+    }
+
+    @Override
+    public void addStart(final Traverser<S> start) {
 
     }
 
@@ -33,7 +42,7 @@ public class EmptyStep<S, E> implements Step<S, E> {
 
     @Override
     public Step<?, S> getPreviousStep() {
-        return instance();
+        return INSTANCE;
     }
 
     @Override
@@ -43,7 +52,7 @@ public class EmptyStep<S, E> implements Step<S, E> {
 
     @Override
     public Step<E, ?> getNextStep() {
-        return instance();
+        return INSTANCE;
     }
 
     @Override
@@ -52,13 +61,18 @@ public class EmptyStep<S, E> implements Step<S, E> {
     }
 
     @Override
-    public Object clone() throws CloneNotSupportedException {
-        return instance();
+    public void setTraversal(final Traversal<?, ?> traversal) {
+
+    }
+
+    @Override
+    public EmptyStep<S, E> clone() throws CloneNotSupportedException {
+        return INSTANCE;
     }
 
     @Override
     public String getLabel() {
-        return Traverser.NO_FUTURE;
+        return Traverser.Admin.DONE;
     }
 
     @Override
@@ -71,19 +85,17 @@ public class EmptyStep<S, E> implements Step<S, E> {
         return false;
     }
 
-    public E getLast() {
-        return (E) NO_OBJECT;
-    }
-
     @Override
     public Traverser<E> next() {
         throw FastNoSuchElementException.instance();
     }
 
-    public static <S, E> Step<S, E> instance() {
-        return INSTANCE;
+    @Override
+    public int hashCode() {
+        return -1691648095;
     }
 
+    @Override
     public boolean equals(final Object object) {
         return object instanceof EmptyStep;
     }

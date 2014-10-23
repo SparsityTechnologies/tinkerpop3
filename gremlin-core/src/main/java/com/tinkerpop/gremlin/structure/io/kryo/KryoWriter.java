@@ -6,16 +6,15 @@ import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Graph;
-import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
 import com.tinkerpop.gremlin.structure.io.GraphWriter;
+import com.tinkerpop.gremlin.structure.util.detached.DetachedEdge;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -84,9 +83,7 @@ public class KryoWriter implements GraphWriter {
     public void writeEdge(final OutputStream outputStream, final Edge e) throws IOException {
         final Output output = new Output(outputStream);
         this.headerWriter.write(kryo, output);
-        kryo.writeClassAndObject(output, e.outV().id().next());
-        kryo.writeClassAndObject(output, e.inV().id().next());
-        writeEdgeToOutput(output, e);
+        kryo.writeClassAndObject(output, DetachedEdge.detach(e));
         output.flush();
     }
 
@@ -103,22 +100,18 @@ public class KryoWriter implements GraphWriter {
     }
 
     private void writeElement(final Output output, final Element e, final Direction direction) {
-        kryo.writeClassAndObject(output, e.id());
-        output.writeString(e.label());
-
-        writeProperties(output, e);
+        kryo.writeClassAndObject(output, e);
 
         if (e instanceof Vertex) {
             output.writeBoolean(direction != null);
             if (direction != null) {
                 final Vertex v = (Vertex) e;
                 kryo.writeObject(output, direction);
-
                 if (direction == Direction.BOTH || direction == Direction.OUT)
-                    writeDirectionalEdges(output, Direction.OUT, v.outE());
+                    writeDirectionalEdges(output, Direction.OUT, v.iterators().edgeIterator(Direction.OUT, Integer.MAX_VALUE));
 
                 if (direction == Direction.BOTH || direction == Direction.IN)
-                    writeDirectionalEdges(output, Direction.IN, v.inE());
+                    writeDirectionalEdges(output, Direction.IN, v.iterators().edgeIterator(Direction.IN, Integer.MAX_VALUE));
             }
 
             kryo.writeClassAndObject(output, VertexTerminator.INSTANCE);
@@ -132,37 +125,11 @@ public class KryoWriter implements GraphWriter {
 
         while (vertexEdges.hasNext()) {
             final Edge edgeToWrite = vertexEdges.next();
-            if (d.equals(Direction.OUT))
-                kryo.writeClassAndObject(output, edgeToWrite.inV().id().next());
-            else if (d.equals(Direction.IN))
-                kryo.writeClassAndObject(output, edgeToWrite.outV().id().next());
             writeEdgeToOutput(output, edgeToWrite);
         }
 
         if (hasEdges)
             kryo.writeClassAndObject(output, EdgeTerminator.INSTANCE);
-    }
-
-    private void writeProperties(final Output output, final Element e) {
-        final Map<String, Property> properties = e.properties();
-        final int propertyCount = properties.size();
-        output.writeInt(propertyCount);
-        properties.forEach((key, val) -> {
-            output.writeString(key);
-            writePropertyValue(output, val);
-        });
-
-        final Map<String, Property> hiddens = e.hiddens();
-        final int hiddenCount = hiddens.size();
-        output.writeInt(hiddenCount);
-        hiddens.forEach((key, val) -> {
-            output.writeString(key);
-            writePropertyValue(output, val);
-        });
-    }
-
-    private void writePropertyValue(final Output output, final Property val) {
-        kryo.writeClassAndObject(output, val.value());
     }
 
     public static Builder build() {

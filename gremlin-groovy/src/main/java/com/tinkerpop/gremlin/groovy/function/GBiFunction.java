@@ -1,12 +1,13 @@
 package com.tinkerpop.gremlin.groovy.function;
 
-import com.tinkerpop.gremlin.util.function.SBiFunction;
 import groovy.lang.Closure;
+
+import java.util.function.BiFunction;
 
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class GBiFunction<A, B, C> implements SBiFunction<A, B, C> {
+public class GBiFunction<A, B, C> implements BiFunction<A, B, C> {
 
     private final Closure closure;
 
@@ -22,8 +23,6 @@ public class GBiFunction<A, B, C> implements SBiFunction<A, B, C> {
     public static GBiFunction[] make(final Closure... closures) {
         final GBiFunction[] functions = new GBiFunction[closures.length];
         for (int i = 0; i < closures.length; i++) {
-            // TODO: Should we do this?
-            // closures[i].dehydrate();
             functions[i] = new GBiFunction(closures[i]);
         }
         return functions;

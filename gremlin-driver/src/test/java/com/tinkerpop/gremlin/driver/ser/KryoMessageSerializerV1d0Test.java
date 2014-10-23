@@ -2,17 +2,17 @@ package com.tinkerpop.gremlin.driver.ser;
 
 import com.tinkerpop.gremlin.driver.MessageSerializer;
 import com.tinkerpop.gremlin.driver.message.ResponseMessage;
-import com.tinkerpop.gremlin.driver.message.ResultCode;
-import com.tinkerpop.gremlin.driver.message.ResultType;
+import com.tinkerpop.gremlin.driver.message.ResponseStatusCode;
 import com.tinkerpop.gremlin.structure.Compare;
+import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Graph;
-import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
 import com.tinkerpop.gremlin.structure.util.detached.DetachedEdge;
 import com.tinkerpop.gremlin.structure.util.detached.DetachedVertex;
 import com.tinkerpop.gremlin.tinkergraph.structure.TinkerFactory;
 import com.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph;
+import com.tinkerpop.gremlin.util.StreamFactory;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.UnpooledByteBufAllocator;
@@ -48,7 +48,7 @@ public class KryoMessageSerializerV1d0Test {
         final ResponseMessage response = convert(list);
         assertCommon(response);
 
-        final List<Integer> deserializedFunList = (List<Integer>) response.getResult();
+        final List<Integer> deserializedFunList = (List<Integer>) response.getResult().getData();
         assertEquals(2, deserializedFunList.size());
         assertEquals(new Integer(1), deserializedFunList.get(0));
         assertEquals(new Integer(100), deserializedFunList.get(1));
@@ -64,7 +64,7 @@ public class KryoMessageSerializerV1d0Test {
         final ResponseMessage response = convert(list);
         assertCommon(response);
 
-        final List<Integer> deserializedFunList = (List<Integer>) response.getResult();
+        final List<Integer> deserializedFunList = (List<Integer>) response.getResult().getData();
         assertEquals(3, deserializedFunList.size());
         assertEquals(new Integer(1), deserializedFunList.get(0));
         assertNull(deserializedFunList.get(1));
@@ -84,7 +84,7 @@ public class KryoMessageSerializerV1d0Test {
         final ResponseMessage response = convert(map);
         assertCommon(response);
 
-        final Map<String, Object> deserializedMap = (Map<String, Object>) response.getResult();
+        final Map<String, Object> deserializedMap = (Map<String, Object>) response.getResult().getData();
         assertEquals(3, deserializedMap.size());
         assertEquals(1, deserializedMap.get("x"));
         assertEquals("some", deserializedMap.get("y"));
@@ -107,19 +107,19 @@ public class KryoMessageSerializerV1d0Test {
         final ResponseMessage response = convert(iterable);
         assertCommon(response);
 
-        final List<DetachedEdge> edgeList = (List<DetachedEdge>) response.getResult();
+        final List<DetachedEdge> edgeList = (List<DetachedEdge>) response.getResult().getData();
         assertEquals(1, edgeList.size());
 
-        final DetachedEdge deserialiedEdge = edgeList.get(0);
-        assertEquals(2l, deserialiedEdge.id());
-        assertEquals("test", deserialiedEdge.label());
+        final DetachedEdge deserializedEdge = edgeList.get(0);
+        assertEquals(2l, deserializedEdge.id());
+        assertEquals("test", deserializedEdge.label());
 
-        assertEquals(new Integer(123), (Integer) deserialiedEdge.value("abc"));
-        assertEquals(1, deserialiedEdge.properties().size());
-        assertEquals(0l, deserialiedEdge.outV().id().next());
-        assertEquals(Vertex.DEFAULT_LABEL, deserialiedEdge.outV().label().next());
-        assertEquals(1l, deserialiedEdge.inV().id().next());
-        assertEquals(Vertex.DEFAULT_LABEL, deserialiedEdge.inV().label().next());
+        assertEquals(new Integer(123), (Integer) deserializedEdge.value("abc"));
+        assertEquals(1, StreamFactory.stream(deserializedEdge.iterators().propertyIterator()).count());
+        assertEquals(0l, deserializedEdge.iterators().vertexIterator(Direction.OUT).next().id());
+        assertEquals(Vertex.DEFAULT_LABEL, deserializedEdge.iterators().vertexIterator(Direction.OUT).next().label());
+        assertEquals(1l, deserializedEdge.iterators().vertexIterator(Direction.IN).next().id());
+        assertEquals(Vertex.DEFAULT_LABEL, deserializedEdge.iterators().vertexIterator(Direction.IN).next().label());
     }
 
     @Test
@@ -142,17 +142,16 @@ public class KryoMessageSerializerV1d0Test {
         final ResponseMessage response = convert(list);
         assertCommon(response);
 
-        final List<DetachedVertex> vertexList = (List<DetachedVertex>) response.getResult();
+        final List<DetachedVertex> vertexList = (List<DetachedVertex>) response.getResult().getData();
         assertEquals(1, vertexList.size());
 
         final DetachedVertex deserializedVertex = vertexList.get(0);
         assertEquals(0l, deserializedVertex.id());
         assertEquals(Vertex.DEFAULT_LABEL, deserializedVertex.label());
 
-        final Map<String, Property> properties = deserializedVertex.properties();
-        assertEquals(1, properties.size());
+        assertEquals(1, StreamFactory.stream(deserializedVertex.iterators().propertyIterator()).count());
 
-        final List<Object> deserializedInnerList = (List<Object>) properties.get("friends").value();
+        final List<Object> deserializedInnerList = (List<Object>) deserializedVertex.iterators().valueIterator("friends").next();
         assertEquals(3, deserializedInnerList.size());
         assertEquals("x", deserializedInnerList.get(0));
         assertEquals(5, deserializedInnerList.get(1));
@@ -164,31 +163,63 @@ public class KryoMessageSerializerV1d0Test {
     }
 
     @Test
-    public void serializeToJsonMapWithElementForKey() throws Exception {
+    public void serializeToMapWithElementForKey() throws Exception {
         final TinkerGraph g = TinkerFactory.createClassic();
         final Map<Vertex, Integer> map = new HashMap<>();
-        map.put(g.V().<Vertex>has("name", Compare.EQUAL, "marko").next(), 1000);
+        map.put(g.V().<Vertex>has("name", Compare.eq, "marko").next(), 1000);
 
         final ResponseMessage response = convert(map);
         assertCommon(response);
 
-        final Map<Vertex, Integer> deserializedMap = (Map<Vertex, Integer>) response.getResult();
+        final Map<Vertex, Integer> deserializedMap = (Map<Vertex, Integer>) response.getResult().getData();
         assertEquals(1, deserializedMap.size());
 
         final Vertex deserializedMarko = deserializedMap.keySet().iterator().next();
-        assertEquals("marko", deserializedMarko.value("name").toString());
+        assertEquals("marko", deserializedMarko.iterators().valueIterator("name").next().toString());
         assertEquals(1, deserializedMarko.id());
         assertEquals(Vertex.DEFAULT_LABEL, deserializedMarko.label());
-        assertEquals(new Integer(29), (Integer) deserializedMarko.value("age"));
-        assertEquals(2, deserializedMarko.properties().size());
+        assertEquals(new Integer(29), (Integer) deserializedMarko.iterators().valueIterator("age").next());
+        assertEquals(2, StreamFactory.stream(deserializedMarko.iterators().propertyIterator()).count());
 
         assertEquals(new Integer(1000), deserializedMap.values().iterator().next());
     }
 
+    @Test
+    public void serializeFullResponseMessage() throws Exception {
+        final UUID id = UUID.randomUUID();
+
+        final Map<String,Object> metaData = new HashMap<>();
+        metaData.put("test", "this");
+        metaData.put("one", 1);
+
+        final Map<String,Object> attributes = new HashMap<>();
+        attributes.put("test", "that");
+        attributes.put("two", 2);
+
+        final ResponseMessage response = ResponseMessage.build(id)
+                .responseMetaData(metaData)
+                .code(ResponseStatusCode.SUCCESS)
+                .result("some-result")
+                .statusAttributes(attributes)
+                .statusMessage("worked")
+                .create();
+
+        final ByteBuf bb = serializer.serializeResponseAsBinary(response, allocator);
+        final ResponseMessage deserialized = serializer.deserializeResponse(bb);
+
+        assertEquals(id, deserialized.getRequestId());
+        assertEquals("this", deserialized.getResult().getMeta().get("test"));
+        assertEquals(1, deserialized.getResult().getMeta().get("one"));
+        assertEquals("some-result", deserialized.getResult().getData());
+        assertEquals("that", deserialized.getStatus().getAttributes().get("test"));
+        assertEquals(2, deserialized.getStatus().getAttributes().get("two"));
+        assertEquals(ResponseStatusCode.SUCCESS.getValue(), deserialized.getStatus().getCode().getValue());
+        assertEquals("worked", deserialized.getStatus().getMessage());
+    }
+
     private void assertCommon(final ResponseMessage response) {
         assertEquals(requestId, response.getRequestId());
-        assertEquals(ResultCode.SUCCESS, response.getCode());
-        assertEquals(ResultType.OBJECT, response.getResultType());
+        assertEquals(ResponseStatusCode.SUCCESS, response.getStatus().getCode());
     }
 
     private ResponseMessage convert(final Object toSerialize) throws SerializationException {

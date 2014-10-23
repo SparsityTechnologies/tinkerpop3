@@ -3,10 +3,12 @@ package com.tinkerpop.gremlin.process.graph.step.sideEffect;
 import com.tinkerpop.gremlin.AbstractGremlinTest;
 import com.tinkerpop.gremlin.LoadGraphWith;
 import com.tinkerpop.gremlin.process.Traversal;
+import com.tinkerpop.gremlin.process.Traverser;
 import com.tinkerpop.gremlin.structure.Vertex;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -19,9 +21,9 @@ import static org.junit.Assert.*;
  */
 public abstract class GroupByTest extends AbstractGremlinTest {
 
-    public abstract Traversal<Vertex, Map<String, List<Vertex>>> get_g_V_groupByXnameX();
+    public abstract Traversal<Vertex, Map<String, Collection<Vertex>>> get_g_V_groupByXnameX();
 
-    public abstract Traversal<Vertex, Map<String, List<String>>> get_g_V_hasXlangX_groupByXa_lang_nameX_out_capXaX();
+    public abstract Traversal<Vertex, Map<String, Collection<String>>> get_g_V_hasXlangX_groupByXa_lang_nameX_out_capXaX();
 
     public abstract Traversal<Vertex, Map<String, Integer>> get_g_V_hasXlangX_groupByXlang_1_sizeX();
 
@@ -32,13 +34,13 @@ public abstract class GroupByTest extends AbstractGremlinTest {
     @Test
     @LoadGraphWith(MODERN)
     public void g_V_groupByXnameX() {
-        final Traversal<Vertex, Map<String, List<Vertex>>> traversal = get_g_V_groupByXnameX();
+        final Traversal<Vertex, Map<String, Collection<Vertex>>> traversal = get_g_V_groupByXnameX();
         printTraversalForm(traversal);
-        final Map<String, List<Vertex>> map = traversal.next();
+        final Map<String, Collection<Vertex>> map = traversal.next();
         assertEquals(6, map.size());
         map.forEach((key, values) -> {
             assertEquals(1, values.size());
-            assertEquals(convertToVertexId(key), values.get(0).id());
+            assertEquals(convertToVertexId(key), values.iterator().next().id());
         });
         assertFalse(traversal.hasNext());
     }
@@ -46,9 +48,9 @@ public abstract class GroupByTest extends AbstractGremlinTest {
     @Test
     @LoadGraphWith(MODERN)
     public void g_V_hasXlangX_groupByXa_lang_nameX_out_capXaX() {
-        final Traversal<Vertex, Map<String, List<String>>> traversal = get_g_V_hasXlangX_groupByXa_lang_nameX_out_capXaX();
+        final Traversal<Vertex, Map<String, Collection<String>>> traversal = get_g_V_hasXlangX_groupByXa_lang_nameX_out_capXaX();
         printTraversalForm(traversal);
-        final Map<String, List<String>> map = traversal.next();
+        final Map<String, Collection<String>> map = traversal.next();
         assertFalse(traversal.hasNext());
         assertEquals(1, map.size());
         assertTrue(map.containsKey("java"));
@@ -91,15 +93,15 @@ public abstract class GroupByTest extends AbstractGremlinTest {
         });
     }
 
-    public static class JavaGroupByTest extends GroupByTest {
+    public static class StandardTest extends GroupByTest {
 
         @Override
-        public Traversal<Vertex, Map<String, List<Vertex>>> get_g_V_groupByXnameX() {
+        public Traversal<Vertex, Map<String, Collection<Vertex>>> get_g_V_groupByXnameX() {
             return (Traversal) g.V().groupBy(v -> v.get().value("name"));
         }
 
         @Override
-        public Traversal<Vertex, Map<String, List<String>>> get_g_V_hasXlangX_groupByXa_lang_nameX_out_capXaX() {
+        public Traversal<Vertex, Map<String, Collection<String>>> get_g_V_hasXlangX_groupByXa_lang_nameX_out_capXaX() {
             return (Traversal) g.V().<Vertex>has("lang")
                     .groupBy("a", v -> v.get().value("lang"),
                             v -> v.get().value("name")).out().cap("a");
@@ -120,20 +122,19 @@ public abstract class GroupByTest extends AbstractGremlinTest {
 
         @Override
         public Traversal<Vertex, Map<String, Integer>> get_g_V_asXxX_out_groupByXa_name_sizeX_jumpXx_loops_lt_2X_capXaX() {
-            return g.V().as("x").out().groupBy("a", v -> v.get().value("name"), v -> v, vv -> vv.size()).jump("x", t -> t.getLoops() < 2).cap("a");
+            return g.V().as("x").out().groupBy("a", v -> v.get().value("name"), Traverser::get, Collection::size).jump("x", t -> t.loops() < 2).cap("a");
         }
     }
 
-    public static class JavaComputerGroupByTest extends GroupByTest {
+    public static class ComputerTest extends GroupByTest {
 
         @Override
-        public Traversal<Vertex, Map<String, List<Vertex>>> get_g_V_groupByXnameX() {
+        public Traversal<Vertex, Map<String, Collection<Vertex>>> get_g_V_groupByXnameX() {
             return (Traversal) g.V().groupBy(v -> v.get().value("name")).submit(g.compute());
         }
 
         @Override
-        public Traversal<Vertex, Map<String, List<String>>> get_g_V_hasXlangX_groupByXa_lang_nameX_out_capXaX() {
-            // TODO: This doesn't work with GraphComputer cause there are no results so you get a NoSuchElementException
+        public Traversal<Vertex, Map<String, Collection<String>>> get_g_V_hasXlangX_groupByXa_lang_nameX_out_capXaX() {
             return (Traversal) g.V().<Vertex>has("lang")
                     .groupBy("a", v -> v.get().value("lang"),
                             v -> v.get().value("name")).out().cap("a").submit(g.compute());
@@ -149,12 +150,12 @@ public abstract class GroupByTest extends AbstractGremlinTest {
 
         @Override
         public Traversal<Vertex, Map<String, Integer>> get_g_V_asXxX_out_groupByXa_name_sizeX_jumpXx_2X_capXaX() {
-            return g.V().as("x").out().groupBy("a", v -> v.get().value("name"), v -> v, vv -> vv.size()).jump("x", 2).<Map<String, Integer>>cap("a").submit(g.compute());
+            return g.V().as("x").out().groupBy("a", v -> v.get().value("name"), v -> v.get(), vv -> vv.size()).jump("x", 2).<Map<String, Integer>>cap("a").submit(g.compute());
         }
 
         @Override
         public Traversal<Vertex, Map<String, Integer>> get_g_V_asXxX_out_groupByXa_name_sizeX_jumpXx_loops_lt_2X_capXaX() {
-            return g.V().as("x").out().groupBy("a", v -> v.get().value("name"), v -> v, vv -> vv.size()).jump("x", t -> t.getLoops() < 2).<Map<String, Integer>>cap("a").submit(g.compute());
+            return g.V().as("x").out().groupBy("a", v -> v.get().value("name"), Traverser::get, Collection::size).jump("x", t -> t.loops() < 2).<Map<String, Integer>>cap("a").submit(g.compute());
         }
     }
 

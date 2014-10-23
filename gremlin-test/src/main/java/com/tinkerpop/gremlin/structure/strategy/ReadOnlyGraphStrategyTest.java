@@ -3,11 +3,14 @@ package com.tinkerpop.gremlin.structure.strategy;
 import com.tinkerpop.gremlin.AbstractGremlinTest;
 import com.tinkerpop.gremlin.FeatureRequirement;
 import com.tinkerpop.gremlin.FeatureRequirementSet;
+import com.tinkerpop.gremlin.process.T;
 import com.tinkerpop.gremlin.structure.Edge;
-import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Graph;
+import com.tinkerpop.gremlin.structure.VertexProperty;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.util.StringFactory;
+import com.tinkerpop.gremlin.util.function.ThrowingConsumer;
 import org.junit.Test;
 
 import static com.tinkerpop.gremlin.structure.Graph.Features.DataTypeFeatures.FEATURE_INTEGER_VALUES;
@@ -67,7 +70,7 @@ public class ReadOnlyGraphStrategyTest extends AbstractGremlinTest {
     @FeatureRequirementSet(FeatureRequirementSet.Package.VERTICES_ONLY)
     public void shouldNotAllowVertexSetProperties() {
         g.addVertex();
-        assertException(g -> g.V().next().properties("test", "test"));
+        assertException(g -> g.V().next().<String>property("test", "test"));
     }
 
     @Test
@@ -78,11 +81,22 @@ public class ReadOnlyGraphStrategyTest extends AbstractGremlinTest {
     }
 
     @Test
+    @FeatureRequirementSet(FeatureRequirementSet.Package.VERTICES_ONLY)
+    @FeatureRequirement(featureClass = Graph.Features.VertexFeatures.class, feature = Graph.Features.VertexFeatures.FEATURE_META_PROPERTIES)
+    public void shouldNotAllowVertexPropertySetProperty() {
+        g.addVertex();
+        assertException(g -> {
+            final VertexProperty p = g.V().next().<String>property("test", "test");
+            p.property("property", "on-a-property");
+        });
+    }
+
+    @Test
     @FeatureRequirementSet(FeatureRequirementSet.Package.SIMPLE)
     public void shouldNotAllowEdgeSetProperties() {
         final Vertex v = g.addVertex();
         v.addEdge("friend", v);
-        assertException(g -> g.E().next().properties("test", "test"));
+        assertException(g -> g.E().next().<String>property("test", "test"));
     }
 
     @Test
@@ -102,7 +116,7 @@ public class ReadOnlyGraphStrategyTest extends AbstractGremlinTest {
         assertEquals("test", p.value());
 
         assertException(g -> {
-            final Property<String> prop = g.V().next().property("test");
+            final VertexProperty<Object> prop = g.V().next().iterators().propertyIterator("test").next();
             prop.remove();
         });
     }
@@ -112,7 +126,7 @@ public class ReadOnlyGraphStrategyTest extends AbstractGremlinTest {
     public void shouldNotAllowEdgePropertyRemoval() {
         final Vertex v = g.addVertex();
         final Edge e = v.addEdge("friend", v);
-        e.properties("test", "test");
+        e.property("test", "test");
         final Property<String> p = e.property("test");
         assertEquals("test", p.value());
 
@@ -139,30 +153,7 @@ public class ReadOnlyGraphStrategyTest extends AbstractGremlinTest {
         swg.variables().asMap().put("will", "not work");
     }
 
-    @Test
-    @FeatureRequirementSet(FeatureRequirementSet.Package.SIMPLE)
-    @FeatureRequirement(featureClass = Graph.Features.VertexPropertyFeatures.class, feature = FEATURE_INTEGER_VALUES)
-    public void shouldReturnWrappedElementToString() {
-        final StrategyWrappedGraph swg = new StrategyWrappedGraph(g);
-        Vertex v1 = swg.addVertex(Element.LABEL, "Person", "age", 1);
-        Vertex v2 = swg.addVertex(Element.LABEL, "Person", "age", 1);
-        Property age = v2.property("age");
-        Edge e1 = v1.addEdge("friend", v2, "weight", "fifty");
-        Vertex originalVertex = ((StrategyWrappedVertex) v1).getBaseVertex();
-        Edge originalEdge = ((StrategyWrappedEdge) e1).getBaseEdge();
-        Property originalProperty = originalVertex.property("age");
-        assertEquals(originalVertex.toString(), v1.toString());
-        assertEquals(originalEdge.toString(), e1.toString());
-        assertEquals(originalProperty.toString(), age.toString());
-    }
-
-    @Test
-    public void shouldReturnWrappedToString() {
-        final StrategyWrappedGraph swg = new StrategyWrappedGraph(g);
-        assertNotEquals(g.toString(), swg.toString());
-    }
-
-    private void assertException(final ConsumerThatThrows stt) {
+    private void assertException(final ThrowingConsumer<Graph> stt) {
         try {
             final StrategyWrappedGraph swg = new StrategyWrappedGraph(g);
             swg.strategy().setGraphStrategy(readOnlyGraphStrategy);
@@ -174,11 +165,5 @@ public class ReadOnlyGraphStrategyTest extends AbstractGremlinTest {
             assertEquals(expectedException.getMessage(), ex.getMessage());
 
         }
-
-    }
-
-    @FunctionalInterface
-    public interface ConsumerThatThrows {
-        public void accept(final StrategyWrappedGraph graph) throws Exception;
     }
 }

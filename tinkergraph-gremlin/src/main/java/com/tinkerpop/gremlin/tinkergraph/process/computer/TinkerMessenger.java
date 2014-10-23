@@ -7,7 +7,6 @@ import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Vertex;
 import com.tinkerpop.gremlin.util.StreamFactory;
 
-import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.Queue;
@@ -16,7 +15,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class TinkerMessenger<M extends Serializable> implements Messenger<M> {
+public class TinkerMessenger<M> implements Messenger<M> {
 
     private final Vertex vertex;
     private final TinkerMessageBoard<M> messageBoard;
@@ -34,18 +33,18 @@ public class TinkerMessenger<M extends Serializable> implements Messenger<M> {
         if (messageType instanceof MessageType.Local) {
             final MessageType.Local<Object, M> localMessageType = (MessageType.Local) messageType;
             final Edge[] edge = new Edge[1]; // simulates storage side-effects available in Gremlin, but not Java8 streams
-            return StreamFactory.iterable(StreamFactory.stream(localMessageType.edges(vertex).reverse())
+            return StreamFactory.iterable(StreamFactory.stream(localMessageType.edges(this.vertex).reverse())
                     .map(e -> {
                         edge[0] = e;
-                        return this.messageBoard.receiveMessages.get(e.toV(localMessageType.getDirection()).id().next());
+                        return this.messageBoard.receiveMessages.get(e.toV(localMessageType.getDirection()).next());
                     })
                     .filter(q -> null != q)
                     .flatMap(q -> q.stream())
                     .map(message -> localMessageType.getEdgeFunction().apply(message, edge[0])));
 
         } else {
-            return StreamFactory.iterable(Arrays.asList(vertex).stream()
-                    .map(v -> this.messageBoard.receiveMessages.get(v.id()))
+            return StreamFactory.iterable(Arrays.asList(this.vertex).stream()
+                    .map(this.messageBoard.receiveMessages::get)
                     .filter(q -> null != q)
                     .flatMap(q -> q.stream()));
         }
@@ -54,23 +53,23 @@ public class TinkerMessenger<M extends Serializable> implements Messenger<M> {
     @Override
     public void sendMessage(final MessageType messageType, final M message) {
         if (messageType instanceof MessageType.Local) {
-            getMessageList(this.vertex.id()).add(message);
+            getMessageList(this.vertex).add(message);
         } else {
             ((MessageType.Global) messageType).vertices().forEach(v -> {
-                final Queue<M> queue = getMessageList(v.id());
+                final Queue<M> queue = getMessageList(v);
                 if (this.combiner.isPresent() && !queue.isEmpty()) {
-                    queue.add(this.combiner.get().combine(queue.remove(), message));
+                    this.combiner.get().combine(queue.remove(), message).forEachRemaining(queue::add);
                 } else
                     queue.add(message);
             });
         }
     }
 
-    private Queue<M> getMessageList(final Object vertexId) {
-        Queue<M> messages = this.messageBoard.sendMessages.get(vertexId);
+    private Queue<M> getMessageList(final Vertex vertex) {
+        Queue<M> messages = this.messageBoard.sendMessages.get(vertex);
         if (null == messages) {
             messages = new ConcurrentLinkedQueue<>();
-            this.messageBoard.sendMessages.put(vertexId, messages);
+            this.messageBoard.sendMessages.put(vertex, messages);
         }
         return messages;
     }

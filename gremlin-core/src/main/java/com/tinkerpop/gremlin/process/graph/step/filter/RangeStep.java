@@ -4,18 +4,19 @@ import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.process.util.FastNoSuchElementException;
 import com.tinkerpop.gremlin.process.util.TraversalHelper;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
+ * @author Bob Briody (http://bobbriody.com)
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class RangeStep<S> extends FilterStep<S> {
+public final class RangeStep<S> extends FilterStep<S> {
 
-    // TODO: May need to make AtomicInteger for the sake of adjustments in setPredicate
-    public int low;
-    public int high;
+    private final long low;
+    private final long high;
+    private final AtomicLong counter = new AtomicLong(0l);
 
-    public RangeStep(final Traversal traversal, final int low, final int high) {
+    public RangeStep(final Traversal traversal, final long low, final long high) {
         super(traversal);
         if (low != -1 && high != -1 && low > high) {
             throw new IllegalArgumentException("Not a legal range: [" + low + ", " + high + "]");
@@ -23,19 +24,55 @@ public class RangeStep<S> extends FilterStep<S> {
         this.low = low;
         this.high = high;
 
-        final AtomicInteger counter = new AtomicInteger(-1);
+
         this.setPredicate(traverser -> {
-            counter.incrementAndGet();
-            if ((this.low == -1 || counter.get() >= this.low) && (this.high == -1 || counter.get() <= this.high))
-                return true;
-            else if (this.high != -1 && counter.get() > this.high)
+            if (this.high != -1 && this.counter.get() > this.high) {
                 throw FastNoSuchElementException.instance();
-            else
+            }
+
+            long avail = traverser.bulk();
+            if (this.counter.get() + avail <= this.low) {
+                // Will not surpass the low w/ this traverser. Skip and filter the whole thing.
+                this.counter.getAndAdd(avail);
                 return false;
+            }
+
+            // Skip for the low and trim for the high. Both can happen at once.
+
+            long toSkip = 0;
+            if (this.counter.get() < this.low) {
+                toSkip = this.low - this.counter.get();
+            }
+
+            long toTrim = 0;
+            if (this.high != -1 && this.counter.get() + avail > this.high) {
+                toTrim = this.counter.get() + avail - this.high - 1;
+            }
+
+            long toEmit = avail - toSkip - toTrim;
+            this.counter.getAndAdd(toSkip + toEmit);
+            traverser.asAdmin().setBulk(toEmit);
+
+            return true;
         });
     }
 
+    @Override
+    public void reset() {
+        super.reset();
+        this.counter.set(0l);
+    }
+
+    @Override
     public String toString() {
         return TraversalHelper.makeStepString(this, this.low, this.high);
+    }
+
+    public long getLowRange() {
+        return this.low;
+    }
+
+    public long getHighRange() {
+        return this.high;
     }
 }

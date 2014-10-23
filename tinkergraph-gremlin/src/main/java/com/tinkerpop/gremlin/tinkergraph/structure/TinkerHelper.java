@@ -1,9 +1,6 @@
 package com.tinkerpop.gremlin.tinkergraph.structure;
 
-import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.process.computer.GraphComputer;
-import com.tinkerpop.gremlin.process.computer.VertexProgram;
-import com.tinkerpop.gremlin.process.graph.strategy.CountCapStrategy;
 import com.tinkerpop.gremlin.process.util.FastNoSuchElementException;
 import com.tinkerpop.gremlin.process.util.MultiIterator;
 import com.tinkerpop.gremlin.structure.Direction;
@@ -13,7 +10,6 @@ import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
 import com.tinkerpop.gremlin.structure.util.ElementHelper;
 import com.tinkerpop.gremlin.tinkergraph.process.computer.TinkerGraphView;
-import com.tinkerpop.gremlin.tinkergraph.process.graph.strategy.TinkerGraphStepStrategy;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -31,12 +27,11 @@ import java.util.stream.Stream;
 public class TinkerHelper {
 
     protected static long getNextId(final TinkerGraph graph) {
-        return Stream.generate(() -> (++graph.currentId)).filter(id -> !graph.vertices.containsKey(id) && !graph.edges.containsKey(id)).findFirst().get();
+        return Stream.generate(() -> (++graph.currentId)).filter(id -> !graph.vertices.containsKey(id) && !graph.edges.containsKey(id)).findAny().get();
     }
 
     protected static Edge addEdge(final TinkerGraph graph, final TinkerVertex outVertex, final TinkerVertex inVertex, final String label, final Object... keyValues) {
-        if (null == label)
-            throw Edge.Exceptions.edgeLabelCanNotBeNull();
+        ElementHelper.validateLabel(label);
         ElementHelper.legalPropertyKeyValueArray(keyValues);
 
         Object idValue = ElementHelper.getIdValue(keyValues).orElse(null);
@@ -96,15 +91,15 @@ public class TinkerHelper {
         return graph.edgeIndex.get(key, value);
     }
 
-    public static TinkerGraphView getGraphView(final TinkerGraph graph) {
-        return graph.graphView;
+    public static boolean inComputerMode(final TinkerGraph graph) {
+        return null != graph.graphView;
     }
 
-    public static TinkerGraphView createGraphView(final TinkerGraph graph, final GraphComputer.Isolation isolation, final Map<String, VertexProgram.KeyType> computeKeys) {
+    public static TinkerGraphView createGraphView(final TinkerGraph graph, final GraphComputer.Isolation isolation, final Set<String> computeKeys) {
         return graph.graphView = new TinkerGraphView(isolation, computeKeys);
     }
 
-    public static Map<String, Property> getProperties(final TinkerElement element) {
+    public static Map<String, List<Property>> getProperties(final TinkerElement element) {
         return element.properties;
     }
 
@@ -153,11 +148,6 @@ public class TinkerHelper {
         if (direction.equals(Direction.IN) || direction.equals(Direction.BOTH))
             vertices.add((TinkerVertex) edge.inVertex);
         return vertices.iterator();
-    }
-
-    public static void prepareTraversalForComputer(final Traversal traversal) {
-        traversal.strategies().unregister(TinkerGraphStepStrategy.class);
-        traversal.strategies().register(CountCapStrategy.instance());
     }
 
     private static class TinkerVertexIterator implements Iterator<TinkerVertex> {

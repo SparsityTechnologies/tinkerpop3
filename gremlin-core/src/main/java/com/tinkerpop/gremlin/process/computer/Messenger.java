@@ -1,7 +1,5 @@
 package com.tinkerpop.gremlin.process.computer;
 
-import java.io.Serializable;
-
 /**
  * The {@link Messenger} serves as the routing system for messages between vertices. For distributed systems,
  * the messenger can implement a "message passing" engine (distributed memory). For single machine systems, the
@@ -11,10 +9,22 @@ import java.io.Serializable;
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  * @author Matthias Broecheler (me@matthiasb.com)
  */
-public interface Messenger<M extends Serializable> {
+public interface Messenger<M> {
 
+    /**
+     * The currently executing vertex can receive the messages of the provided {@link MessageType}.
+     *
+     * @param messageType the message type of the messages to receive
+     * @return the messages for that vertex
+     */
     public Iterable<M> receiveMessages(final MessageType messageType);
 
+    /**
+     * The currently executing vertex can send a message with provided {@link MessageType}.
+     *
+     * @param messageType the message type of the message being sent
+     * @param message     the message to send
+     */
     public void sendMessage(final MessageType messageType, final M message);
 
 }

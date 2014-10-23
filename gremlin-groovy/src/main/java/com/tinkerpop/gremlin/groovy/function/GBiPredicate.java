@@ -1,12 +1,13 @@
 package com.tinkerpop.gremlin.groovy.function;
 
-import com.tinkerpop.gremlin.util.function.SBiPredicate;
 import groovy.lang.Closure;
+
+import java.util.function.BiPredicate;
 
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class GBiPredicate<A, B> implements SBiPredicate<A, B> {
+public class GBiPredicate<A, B> implements BiPredicate<A, B> {
 
     private final Closure closure;
 
@@ -22,8 +23,6 @@ public class GBiPredicate<A, B> implements SBiPredicate<A, B> {
     public static GBiPredicate[] make(final Closure... closures) {
         final GBiPredicate[] functions = new GBiPredicate[closures.length];
         for (int i = 0; i < closures.length; i++) {
-            // TODO: Should we do this?
-            // closures[i].dehydrate();
             functions[i] = new GBiPredicate(closures[i]);
         }
         return functions;

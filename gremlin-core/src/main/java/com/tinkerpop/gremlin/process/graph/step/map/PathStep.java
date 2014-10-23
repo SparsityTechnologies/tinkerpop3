@@ -4,27 +4,29 @@ import com.tinkerpop.gremlin.process.Path;
 import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.process.graph.marker.PathConsumer;
 import com.tinkerpop.gremlin.process.util.FunctionRing;
-import com.tinkerpop.gremlin.util.function.SFunction;
+import com.tinkerpop.gremlin.process.util.MutablePath;
+
+import java.util.function.Function;
 
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class PathStep<S> extends MapStep<S, Path> implements PathConsumer {
+public final class PathStep<S> extends MapStep<S, Path> implements PathConsumer {
 
-    public FunctionRing functionRing;
+    private final FunctionRing functionRing;
 
-    public PathStep(final Traversal traversal, final SFunction... pathFunctions) {
+    public PathStep(final Traversal traversal, final Function... pathFunctions) {
         super(traversal);
         this.functionRing = (pathFunctions.length == 0) ? null : new FunctionRing(pathFunctions);
         this.setFunction(traverser -> {
-            final Path path = new Path();
             if (null == this.functionRing)
-                path.add(traverser.getPath());
+                return traverser.path();
             else {
-                traverser.getPath().forEach((a, b) -> path.add(a, this.functionRing.next().apply(b)));
+                final Path path = MutablePath.make();
+                traverser.path().forEach((labels, object) -> path.extend(labels, this.functionRing.next().apply(object)));
                 this.functionRing.reset();
+                return path;
             }
-            return path;
         });
     }
 

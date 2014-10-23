@@ -4,6 +4,7 @@ import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.util.StringFactory;
 
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
@@ -41,8 +42,8 @@ public class StrategyWrappedProperty<V> implements Property<V>, StrategyWrapped 
     }
 
     @Override
-    public <E extends Element> E getElement() {
-        final Element baseElement = this.baseProperty.getElement();
+    public <E extends Element> E element() {
+        final Element baseElement = this.baseProperty.element();
         return (E) (baseElement instanceof Vertex ? new StrategyWrappedVertex((Vertex) baseElement, strategyWrappedGraph) :
                 new StrategyWrappedEdge((Edge) baseElement, strategyWrappedGraph));
     }
@@ -53,8 +54,8 @@ public class StrategyWrappedProperty<V> implements Property<V>, StrategyWrapped 
     }
 
     @Override
-    public V orElseGet(final Supplier<? extends V> edgeSupplier) {
-        return this.baseProperty.orElseGet(edgeSupplier);
+    public V orElseGet(final Supplier<? extends V> valueSupplier) {
+        return this.baseProperty.orElseGet(valueSupplier);
     }
 
     @Override
@@ -84,6 +85,7 @@ public class StrategyWrappedProperty<V> implements Property<V>, StrategyWrapped 
 
     @Override
     public String toString() {
-        return baseProperty.toString();
+        final GraphStrategy strategy = strategyWrappedGraph.strategy().getGraphStrategy().orElse(GraphStrategy.DefaultGraphStrategy.INSTANCE);
+        return StringFactory.graphStrategyPropertyString(strategy, this.baseProperty);
     }
 }

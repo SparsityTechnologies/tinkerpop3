@@ -1,29 +1,25 @@
 package com.tinkerpop.gremlin.groovy;
 
 import com.tinkerpop.gremlin.algorithm.generator.AbstractGenerator;
-import com.tinkerpop.gremlin.groovy.engine.function.GLambda;
+import com.tinkerpop.gremlin.groovy.function.GFunction;
 import com.tinkerpop.gremlin.groovy.loaders.GremlinLoader;
+import com.tinkerpop.gremlin.process.T;
 import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.process.computer.GraphComputer;
-import com.tinkerpop.gremlin.process.computer.VertexProgram;
 import com.tinkerpop.gremlin.process.computer.clustering.peerpressure.PeerPressureVertexProgram;
 import com.tinkerpop.gremlin.process.computer.lambda.LambdaVertexProgram;
 import com.tinkerpop.gremlin.process.computer.ranking.pagerank.PageRankVertexProgram;
 import com.tinkerpop.gremlin.process.computer.traversal.TraversalVertexProgram;
-import com.tinkerpop.gremlin.structure.Compare;
-import com.tinkerpop.gremlin.structure.Direction;
-import com.tinkerpop.gremlin.structure.Graph;
+import com.tinkerpop.gremlin.process.util.TraversalMetrics;
+import com.tinkerpop.gremlin.structure.*;
 import com.tinkerpop.gremlin.structure.io.GraphReader;
 import com.tinkerpop.gremlin.structure.io.graphml.GraphMLReader;
 import com.tinkerpop.gremlin.structure.io.graphson.GraphSONReader;
 import com.tinkerpop.gremlin.structure.io.kryo.KryoReader;
-import com.tinkerpop.gremlin.structure.io.util.IoVertex;
 import com.tinkerpop.gremlin.structure.strategy.GraphStrategy;
 import com.tinkerpop.gremlin.structure.util.GraphFactory;
 import com.tinkerpop.gremlin.structure.util.batch.BatchGraph;
 import com.tinkerpop.gremlin.structure.util.detached.DetachedElement;
-import com.tinkerpop.gremlin.tinkergraph.process.computer.TinkerGraphComputer;
-import com.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph;
 import com.tinkerpop.gremlin.util.Gremlin;
 import com.tinkerpop.gremlin.util.function.FunctionUtils;
 import groovy.grape.Grape;
@@ -60,24 +56,19 @@ public abstract class AbstractImportCustomizerProvider implements ImportCustomiz
         // graph process
         imports.add(Traversal.class.getPackage().getName() + DOT_STAR);
         imports.add(GraphComputer.class.getPackage().getName() + DOT_STAR);
-        staticImports.add(VertexProgram.KeyType.class.getCanonicalName() + DOT_STAR);
 
         // utils
         imports.add(Gremlin.class.getPackage().getName() + DOT_STAR);
         imports.add(GremlinLoader.class.getPackage().getName() + DOT_STAR);
         imports.add(FunctionUtils.class.getPackage().getName() + DOT_STAR);
-        imports.add(GLambda.class.getPackage().getName() + DOT_STAR);
-
-        // tinkergraph
-        imports.add(TinkerGraph.class.getPackage().getName() + DOT_STAR);
-        imports.add(TinkerGraphComputer.class.getPackage().getName() + DOT_STAR);
+        imports.add(GFunction.class.getPackage().getName() + DOT_STAR);
+        imports.add(TraversalMetrics.class.getPackage().getName() + DOT_STAR);
 
         // IO packages
         imports.add(GraphReader.class.getPackage().getName() + DOT_STAR);
         imports.add(GraphMLReader.class.getPackage().getName() + DOT_STAR);
         imports.add(GraphSONReader.class.getPackage().getName() + DOT_STAR);
         imports.add(KryoReader.class.getPackage().getName() + DOT_STAR);
-        imports.add(IoVertex.class.getPackage().getName() + DOT_STAR);
 
         // algorithms
         imports.add(AbstractGenerator.class.getPackage().getName() + DOT_STAR);
@@ -93,8 +84,11 @@ public abstract class AbstractImportCustomizerProvider implements ImportCustomiz
         // external
         imports.add(Configuration.class.getPackage().getName() + DOT_STAR);
 
+        staticImports.add(T.class.getCanonicalName() + DOT_STAR);
         staticImports.add(Direction.class.getCanonicalName() + DOT_STAR);
         staticImports.add(Compare.class.getCanonicalName() + DOT_STAR);
+        staticImports.add(Contains.class.getCanonicalName() + DOT_STAR);
+        staticImports.add(Order.class.getCanonicalName() + DOT_STAR);
     }
 
     @Override

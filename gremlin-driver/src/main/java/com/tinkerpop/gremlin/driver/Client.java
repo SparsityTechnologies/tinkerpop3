@@ -2,14 +2,9 @@ package com.tinkerpop.gremlin.driver;
 
 import com.tinkerpop.gremlin.driver.exception.ConnectionException;
 import com.tinkerpop.gremlin.driver.message.RequestMessage;
-import com.tinkerpop.gremlin.process.Traversal;
-import com.tinkerpop.gremlin.structure.Graph;
-import com.tinkerpop.gremlin.util.Serializer;
-import com.tinkerpop.gremlin.util.function.SFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -74,7 +69,7 @@ public abstract class Client {
     }
 
     public ResultSet submit(final String gremlin) {
-        return submit(gremlin, (Map<String, Object>) null);
+        return submit(gremlin, null);
     }
 
     public ResultSet submit(final String gremlin, final Map<String, Object> parameters) {
@@ -85,39 +80,8 @@ public abstract class Client {
         }
     }
 
-    public ResultSet submit(final SFunction<Graph, Traversal> traversal) {
-        return submit("g", traversal);
-    }
-
-    public ResultSet submit(final String graph, final SFunction<Graph, Traversal> traversal) {
-        try {
-            return submitAsync(graph, traversal).get();
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
-    public CompletableFuture<ResultSet> submitAsync(final SFunction<Graph, Traversal> traversal) {
-        return submitAsync("g", traversal);
-    }
-
-    public CompletableFuture<ResultSet> submitAsync(final String graph, final SFunction<Graph, Traversal> traversal) {
-        try {
-            final byte[] bytes = Serializer.serializeObject(traversal);
-            final RequestMessage request = buildMessage(RequestMessage.build(Tokens.OPS_TRAVERSE)
-                    .add(Tokens.ARGS_GREMLIN, bytes)
-                    .add(Tokens.ARGS_GRAPH_NAME, graph)
-                    .add(Tokens.ARGS_BATCH_SIZE, cluster.connectionPoolSettings().resultIterationBatchSize));
-
-            return submitAsync(request);
-        } catch (IOException ioe) {
-            ioe.printStackTrace();
-            throw new RuntimeException(ioe);
-        }
-    }
-
     public CompletableFuture<ResultSet> submitAsync(final String gremlin) {
-        return submitAsync(gremlin, (Map<String, Object>) null);
+        return submitAsync(gremlin, null);
     }
 
     public CompletableFuture<ResultSet> submitAsync(final String gremlin, final Map<String, Object> parameters) {

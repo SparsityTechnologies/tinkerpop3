@@ -40,8 +40,8 @@ public abstract class GroupCountTest extends AbstractGremlinTest {
         printTraversalForm(traversal);
         final Map<Object, Long> map = traversal.next();
         assertEquals(map.size(), 2);
-        assertEquals(map.get("lop"), Long.valueOf(3l));
-        assertEquals(map.get("ripple"), Long.valueOf(1l));
+        assertEquals(Long.valueOf(3l),map.get("lop"));
+        assertEquals(Long.valueOf(1l),map.get("ripple"));
         assertFalse(traversal.hasNext());
     }
 
@@ -52,8 +52,8 @@ public abstract class GroupCountTest extends AbstractGremlinTest {
             printTraversalForm(traversal);
             final Map<Object, Long> map = traversal.next();
             assertEquals(map.size(), 2);
-            assertEquals(map.get("lop").longValue(), 3l);
-            assertEquals(map.get("ripple").longValue(), 1l);
+            assertEquals(3l,map.get("lop").longValue());
+            assertEquals(1l,map.get("ripple").longValue());
             assertFalse(traversal.hasNext());
         });
     }
@@ -64,7 +64,7 @@ public abstract class GroupCountTest extends AbstractGremlinTest {
         final Traversal<Vertex, Map<Object, Long>> traversal = get_g_V_filterXfalseX_groupCount();
         printTraversalForm(traversal);
         final Map<Object, Long> map = traversal.next();
-        assertEquals(map.size(), 0);
+        assertEquals(0,map.size());
         assertFalse(traversal.hasNext());
     }
 
@@ -78,15 +78,15 @@ public abstract class GroupCountTest extends AbstractGremlinTest {
             printTraversalForm(traversal);
             final Map<Object, Long> map = traversal.next();
             assertFalse(traversal.hasNext());
-            assertEquals(map.size(), 4);
-            assertEquals(map.get("lop").longValue(), 4l);
-            assertEquals(map.get("ripple").longValue(), 2l);
-            assertEquals(map.get("josh").longValue(), 1l);
-            assertEquals(map.get("vadas").longValue(), 1l);
+            assertEquals(4,map.size(), 4);
+            assertEquals(4l,map.get("lop").longValue());
+            assertEquals(2l,map.get("ripple").longValue());
+            assertEquals(1l,map.get("josh").longValue());
+            assertEquals(1l,map.get("vadas").longValue());
         });
     }
 
-    public static class JavaGroupCountTest extends GroupCountTest {
+    public static class StandardTest extends GroupCountTest {
 
         @Override
         public Traversal<Vertex, Map<Object, Long>> get_g_V_outXcreatedX_groupCountXnameX() {
@@ -112,7 +112,7 @@ public abstract class GroupCountTest extends AbstractGremlinTest {
         public Traversal<Vertex, Map<Object, Long>> get_g_V_asXxX_out_groupCountXa_nameX_jumpXx_loops_lt_2X_capXaX() {
             return g.V().as("x").out()
                     .groupCount("a", v -> v.get().value("name"))
-                    .jump("x", h -> h.getLoops() < 2).cap("a");
+                    .jump("x", h -> h.loops() < 2).cap("a");
         }
 
         @Override
@@ -123,7 +123,7 @@ public abstract class GroupCountTest extends AbstractGremlinTest {
         }
     }
 
-    public static class JavaComputerGroupCountTest extends GroupCountTest {
+    public static class ComputerTest extends GroupCountTest {
 
         @Override
         public Traversal<Vertex, Map<Object, Long>> get_g_V_outXcreatedX_groupCountXnameX() {
@@ -149,7 +149,7 @@ public abstract class GroupCountTest extends AbstractGremlinTest {
         public Traversal<Vertex, Map<Object, Long>> get_g_V_asXxX_out_groupCountXa_nameX_jumpXx_loops_lt_2X_capXaX() {
             return g.V().as("x").out()
                     .groupCount("a", v -> v.get().value("name"))
-                    .jump("x", t -> t.getLoops() < 2).<Map<Object, Long>>cap("a").submit(g.compute());
+                    .jump("x", t -> t.loops() < 2).<Map<Object, Long>>cap("a").submit(g.compute());
         }
 
         @Override

@@ -3,16 +3,16 @@ package com.tinkerpop.gremlin.neo4j.structure;
 import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Property;
+import com.tinkerpop.gremlin.structure.VertexProperty;
 import com.tinkerpop.gremlin.structure.util.ElementHelper;
 import com.tinkerpop.gremlin.structure.util.StringFactory;
+import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.PropertyContainer;
-
-import java.io.Serializable;
 
 /**
  * @author Stephen Mallette (http://stephen.genoprime.com)
  */
-public class Neo4jProperty<V> implements Property<V>, Serializable {
+public class Neo4jProperty<V> implements Property<V> {
 
     private final Element element;
     private final String key;
@@ -23,11 +23,13 @@ public class Neo4jProperty<V> implements Property<V>, Serializable {
         this.element = element;
         this.key = key;
         this.value = value;
-        this.graph = ((Neo4jElement) element).graph;
+        this.graph = element instanceof Neo4jVertexProperty ?
+                ((Neo4jVertex) (((Neo4jVertexProperty) element).element())).graph :
+                ((Neo4jElement) element).graph;
     }
 
     @Override
-    public <E extends Element> E getElement() {
+    public <E extends Element> E element() {
         return (E) this.element;
     }
 
@@ -65,10 +67,18 @@ public class Neo4jProperty<V> implements Property<V>, Serializable {
 
     @Override
     public void remove() {
-        final PropertyContainer rawElement = ((Neo4jElement) element).getBaseElement();
-        if (rawElement.hasProperty(key)) {
-            this.graph.tx().readWrite();
-            rawElement.removeProperty(key);
+        this.graph.tx().readWrite();
+        if (this.element instanceof VertexProperty) {
+            final Node node = ((Neo4jVertexProperty) this.element).getBaseVertex();
+            if (null != node && node.hasProperty(this.key)) {
+                node.removeProperty(this.key);
+            }
+        } else {
+            final PropertyContainer propertyContainer = ((Neo4jElement) this.element).getBaseElement();
+            if (propertyContainer.hasProperty(this.key)) {
+                propertyContainer.removeProperty(this.key);
+            }
         }
     }
+
 }

@@ -13,7 +13,7 @@ import java.util.Iterator;
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class GiraphReduce extends Reducer<KryoWritable, KryoWritable, KryoWritable, KryoWritable> {
+public final class GiraphReduce extends Reducer<KryoWritable, KryoWritable, KryoWritable, KryoWritable> {
 
     private MapReduce mapReduce;
 
@@ -67,7 +67,7 @@ public class GiraphReduce extends Reducer<KryoWritable, KryoWritable, KryoWritab
             this.valueWritable.set(value);
             try {
                 this.context.write(this.keyWritable, this.valueWritable);
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 throw new IllegalStateException(e.getMessage(), e);
             }
         }

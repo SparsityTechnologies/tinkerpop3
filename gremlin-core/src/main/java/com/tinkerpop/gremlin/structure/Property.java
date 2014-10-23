@@ -7,14 +7,15 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * A {@link Property} denotes a key/value pair associated with an {@link Element} (i.e. a {@link Vertex} or {@link Edge}).
- * A property is much like a Java8 {@link java.util.Optional} in that a property can be not present (i.e. empty).
- * The key of a property is always a String and the value of a property is an arbitrary Java object.
- * Each underlying graph engine will typically have constraints on what Java objects are allowed to be used as values.
+ * A {@link Property} denotes a key/value pair associated with an {@link Edge}. A property is much like a Java8
+ * {@link java.util.Optional} in that a property can be not present (i.e. empty). The key of a property is always a
+ * String and the value of a property is an arbitrary Java object. Each underlying graph engine will typically have
+ * constraints on what Java objects are allowed to be used as values.
  *
  * @author Marko A. Rodriguez (http://markorodriguez.com)
+ * @author Stephen Mallette (http://stephen.genoprime.com)
  */
-public abstract interface Property<V> {
+public interface Property<V> {
 
     /**
      * The key of the property.
@@ -24,7 +25,7 @@ public abstract interface Property<V> {
     public String key();
 
     /**
-     * The varlue of the property.
+     * The value of the property.
      *
      * @return The property value
      * @throws NoSuchElementException thrown if the property is empty
@@ -61,11 +62,11 @@ public abstract interface Property<V> {
     /**
      * If the value is present, return the value, else generate a value given the {@link Supplier}.
      *
-     * @param edgeSupplier The supplier to use to generate a value if the property is not present
+     * @param valueSupplier The supplier to use to generate a value if the property is not present
      * @return A value
      */
-    public default V orElseGet(final Supplier<? extends V> edgeSupplier) {
-        return this.isPresent() ? this.value() : edgeSupplier.get();
+    public default V orElseGet(final Supplier<? extends V> valueSupplier) {
+        return this.isPresent() ? this.value() : valueSupplier.get();
     }
 
     /**
@@ -95,7 +96,7 @@ public abstract interface Property<V> {
      * @param <E> The element type (i.e. {@link Vertex} or {@link Edge})
      * @return The element associated with this property
      */
-    public <E extends Element> E getElement();
+    public <E extends Element> E element();
 
     /**
      * Remove the property from the associated element.
@@ -116,17 +117,6 @@ public abstract interface Property<V> {
      * Common exceptions to use with a property.
      */
     public static class Exceptions {
-        public static IllegalArgumentException propertyKeyIsReserved(final String key) {
-            return new IllegalArgumentException("Property key is reserved for all elements: " + key);
-        }
-
-        public static IllegalArgumentException propertyKeyIdIsReserved() {
-            return propertyKeyIsReserved(Element.ID);
-        }
-
-        public static IllegalArgumentException propertyKeyLabelIsReserved() {
-            return propertyKeyIsReserved(Element.LABEL);
-        }
 
         public static IllegalArgumentException propertyKeyCanNotBeEmpty() {
             return new IllegalArgumentException("Property key can not be the empty string");
@@ -138,6 +128,10 @@ public abstract interface Property<V> {
 
         public static IllegalArgumentException propertyValueCanNotBeNull() {
             return new IllegalArgumentException("Property value can not be null");
+        }
+
+        public static IllegalArgumentException propertyKeyCanNotBeASystemKey(final String key) {
+            return new IllegalArgumentException("Property key can not be a system key: " + key);
         }
 
         public static IllegalStateException propertyDoesNotExist() {

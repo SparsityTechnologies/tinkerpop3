@@ -2,25 +2,25 @@ package com.tinkerpop.gremlin.process.graph.step.filter;
 
 import com.tinkerpop.gremlin.process.Step;
 import com.tinkerpop.gremlin.process.Traversal;
+import com.tinkerpop.gremlin.process.util.SingleIterator;
 import com.tinkerpop.gremlin.process.util.TraversalHelper;
 import com.tinkerpop.gremlin.process.util.TraverserIterator;
-import com.tinkerpop.gremlin.util.function.SBiPredicate;
 
-import java.util.Arrays;
 import java.util.Map;
+import java.util.function.BiPredicate;
 
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class WhereStep<E> extends FilterStep<Map<String, E>> {
+public final class WhereStep<E> extends FilterStep<Map<String, E>> {
 
-    public final String firstKey;
-    public final String secondKey;
-    public final SBiPredicate biPredicate;
-    public final Traversal constraint;
+    private final String firstKey;
+    private final String secondKey;
+    private final BiPredicate biPredicate;
+    private final Traversal constraint;
 
 
-    public WhereStep(final Traversal traversal, final String firstKey, final String secondKey, final SBiPredicate biPredicate) {
+    public WhereStep(final Traversal traversal, final String firstKey, final String secondKey, final BiPredicate<E, E> biPredicate) {
         super(traversal);
         this.firstKey = firstKey;
         this.secondKey = secondKey;
@@ -29,11 +29,11 @@ public class WhereStep<E> extends FilterStep<Map<String, E>> {
 
         this.setPredicate(traverser -> {
             final Map<String, E> map = traverser.get();
-            if (!map.containsKey(firstKey))
-                throw new IllegalArgumentException("The provided key is not in the current map: " + firstKey);
-            if (!map.containsKey(secondKey))
-                throw new IllegalArgumentException("The provided key is not in the current map: " + secondKey);
-            return biPredicate.test(map.get(firstKey), map.get(secondKey));
+            if (!map.containsKey(this.firstKey))
+                throw new IllegalArgumentException("The provided key is not in the current map: " + this.firstKey);
+            if (!map.containsKey(this.secondKey))
+                throw new IllegalArgumentException("The provided key is not in the current map: " + this.secondKey);
+            return biPredicate.test(map.get(this.firstKey), map.get(this.secondKey));
         });
     }
 
@@ -60,7 +60,7 @@ public class WhereStep<E> extends FilterStep<Map<String, E>> {
             } else
                 endObject = null;
 
-            startStep.addStarts(new TraverserIterator<>(startStep, TraversalHelper.trackPaths(constraint), Arrays.asList(startObject).iterator()));
+            startStep.addStarts(new TraverserIterator<>(startStep, TraversalHelper.trackPaths(constraint), new SingleIterator<>(startObject)));
             if (null == endObject) {
                 if (constraint.hasNext()) {
                     constraint.reset();
@@ -83,6 +83,10 @@ public class WhereStep<E> extends FilterStep<Map<String, E>> {
 
     public boolean hasBiPredicate() {
         return null != this.biPredicate;
+    }
+
+    public Traversal getConstraint() {
+        return this.constraint;
     }
 
 

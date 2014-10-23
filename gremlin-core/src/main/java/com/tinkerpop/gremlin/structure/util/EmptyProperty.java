@@ -37,13 +37,13 @@ public class EmptyProperty<V> implements Property<V> {
     }
 
     @Override
-    public <E extends Element> E getElement() {
+    public <E extends Element> E element() {
         throw Exceptions.propertyDoesNotExist();
     }
 
     @Override
     public void remove() {
-        throw Exceptions.propertyDoesNotExist();
+
     }
 
     @Override

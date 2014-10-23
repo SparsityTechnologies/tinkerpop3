@@ -1,32 +1,37 @@
 package com.tinkerpop.gremlin.process.graph.step.sideEffect.mapreduce;
 
 import com.tinkerpop.gremlin.process.computer.MapReduce;
+import com.tinkerpop.gremlin.process.computer.traversal.TraversalVertexProgram;
+import com.tinkerpop.gremlin.process.computer.util.GraphComputerHelper;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.GroupCountStep;
-import com.tinkerpop.gremlin.structure.Graph;
-import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.util.StringFactory;
 import org.apache.commons.configuration.Configuration;
 import org.javatuples.Pair;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class GroupCountMapReduce implements MapReduce<Object, Long, Object, Long, Map<Object, Long>> {
+public final class GroupCountMapReduce implements MapReduce<Object, Long, Object, Long, Map<Object, Long>> {
 
     public static final String GROUP_COUNT_STEP_SIDE_EFFECT_KEY = "gremlin.groupCountStep.sideEffectKey";
 
     private String sideEffectKey;
+    private Supplier<Map<Object, Long>> mapSupplier;
 
-    public GroupCountMapReduce() {
+    private GroupCountMapReduce() {
 
     }
 
     public GroupCountMapReduce(final GroupCountStep step) {
         this.sideEffectKey = step.getSideEffectKey();
+        this.mapSupplier = step.getTraversal().sideEffects().<Map<Object, Long>>getRegisteredSupplier(this.sideEffectKey).orElse(HashMap::new);
     }
 
     @Override
@@ -37,6 +42,8 @@ public class GroupCountMapReduce implements MapReduce<Object, Long, Object, Long
     @Override
     public void loadState(final Configuration configuration) {
         this.sideEffectKey = configuration.getString(GROUP_COUNT_STEP_SIDE_EFFECT_KEY);
+        this.mapSupplier = TraversalVertexProgram.getTraversalSupplier(configuration).get().sideEffects().<Map<Object, Long>>getRegisteredSupplier(this.sideEffectKey).orElse(HashMap::new);
+
     }
 
     @Override
@@ -46,9 +53,7 @@ public class GroupCountMapReduce implements MapReduce<Object, Long, Object, Long
 
     @Override
     public void map(final Vertex vertex, final MapEmitter<Object, Long> emitter) {
-        final Property<Map<Object, Number>> groupCountProperty = vertex.property(Graph.Key.hide(this.sideEffectKey));
-        if (groupCountProperty.isPresent())
-            groupCountProperty.value().forEach((k, v) -> emitter.emit(k, v.longValue()));
+        TraversalVertexProgram.getLocalSideEffects(vertex).<Map<Object, Number>>orElse(this.sideEffectKey, Collections.emptyMap()).forEach((k, v) -> emitter.emit(k, v.longValue()));
     }
 
     @Override
@@ -66,14 +71,29 @@ public class GroupCountMapReduce implements MapReduce<Object, Long, Object, Long
     }
 
     @Override
-    public Map<Object, Long> generateSideEffect(final Iterator<Pair<Object, Long>> keyValues) {
-        final Map<Object, Long> result = new HashMap<>();
-        keyValues.forEachRemaining(pair -> result.put(pair.getValue0(), pair.getValue1()));
-        return result;
+    public Map<Object, Long> generateFinalResult(final Iterator<Pair<Object, Long>> keyValues) {
+        final Map<Object, Long> map = this.mapSupplier.get();
+        keyValues.forEachRemaining(pair -> map.put(pair.getValue0(), pair.getValue1()));
+        return map;
     }
 
     @Override
-    public String getSideEffectKey() {
+    public String getMemoryKey() {
         return this.sideEffectKey;
+    }
+
+    @Override
+    public int hashCode() {
+        return (this.getClass().getCanonicalName() + this.sideEffectKey).hashCode();
+    }
+
+    @Override
+    public boolean equals(final Object object) {
+        return GraphComputerHelper.areEqual(this, object);
+    }
+
+    @Override
+    public String toString() {
+        return StringFactory.mapReduceString(this, this.sideEffectKey);
     }
 }

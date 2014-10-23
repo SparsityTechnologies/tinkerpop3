@@ -1,9 +1,9 @@
 package com.tinkerpop.gremlin.tinkergraph.structure;
 
+import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Property;
-import com.tinkerpop.gremlin.structure.Vertex;
 import com.tinkerpop.gremlin.structure.util.ElementHelper;
 import com.tinkerpop.gremlin.structure.util.StringFactory;
 
@@ -12,22 +12,22 @@ import java.io.Serializable;
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class TinkerProperty<V> implements Property<V>, Serializable {
+public class TinkerProperty<V> implements Property<V> {
 
-    private final Element element;
-    private final String key;
-    private final TinkerGraph graph;
-    private V value;
+    protected final Element element;
+    protected final String key;
+    protected V value;
+    protected final TinkerGraph graph;
 
     public TinkerProperty(final Element element, final String key, final V value) {
         this.element = element;
         this.key = key;
         this.value = value;
-        this.graph = ((TinkerElement) element).graph;
+        this.graph = ((TinkerElement) this.element).graph;
     }
 
     @Override
-    public <E extends Element> E getElement() {
+    public <E extends Element> E element() {
         return (E) this.element;
     }
 
@@ -60,15 +60,14 @@ public class TinkerProperty<V> implements Property<V>, Serializable {
     }
 
     public int hashCode() {
-        return this.key.hashCode() + this.value.hashCode() + this.element.hashCode();
+        // todo: can't use the VertexProperty to get the hashcode or it goes StackOverflow
+        return this.key.hashCode() + this.value.hashCode() + (this.element instanceof TinkerVertexProperty ? 0 : this.element.hashCode());
     }
 
     @Override
     public void remove() {
-        ((TinkerElement) this.element).properties.remove(key);
-        if (this.element instanceof Vertex)
-            this.graph.vertexIndex.remove(key, value, (TinkerVertex) this.element);
-        else
+        ((TinkerElement) this.element).properties.remove(this.key);
+        if (this.element instanceof Edge)
             this.graph.edgeIndex.remove(key, value, (TinkerEdge) this.element);
     }
 }

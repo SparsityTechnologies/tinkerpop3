@@ -2,12 +2,13 @@ package com.tinkerpop.gremlin.process.computer;
 
 import com.tinkerpop.gremlin.structure.Graph;
 
-import java.io.Serializable;
-
 /**
+ * The result of the {@link GraphComputer}'s computation. This is returned in a {@link java.util.concurrent.Future} by GraphComputer.submit().
+ * A GraphComputer computation yields two things: an updated view of the computed on {@link Graph} and any computational sideEffects called {@link Memory}.
+ *
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class ComputerResult implements Serializable {
+public final class ComputerResult {
 
     private final Graph graph;
     private final Memory memory;
@@ -17,11 +18,21 @@ public class ComputerResult implements Serializable {
         this.memory = memory;
     }
 
-    public Graph getGraph() {
+    /**
+     * Get the view of the original {@link Graph} computed on by the GraphComputer.
+     *
+     * @return The computed graph
+     */
+    public Graph graph() {
         return this.graph;
     }
 
-    public Memory getMemory() {
+    /**
+     * Get the computational sideEffects called {@link Memory} of the GraphComputer.
+     *
+     * @return the computed memory
+     */
+    public Memory memory() {
         return this.memory;
     }
 

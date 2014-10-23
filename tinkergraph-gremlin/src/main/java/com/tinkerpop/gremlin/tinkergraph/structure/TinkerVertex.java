@@ -5,43 +5,79 @@ import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.VertexProperty;
 import com.tinkerpop.gremlin.structure.util.ElementHelper;
 import com.tinkerpop.gremlin.structure.util.StringFactory;
 import com.tinkerpop.gremlin.tinkergraph.process.graph.TinkerElementTraversal;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class TinkerVertex extends TinkerElement implements Vertex {
+public class TinkerVertex extends TinkerElement implements Vertex, Vertex.Iterators {
 
     protected Map<String, Set<Edge>> outEdges = new HashMap<>();
     protected Map<String, Set<Edge>> inEdges = new HashMap<>();
+    private static final Object[] EMPTY_ARGS = new Object[0];
 
     protected TinkerVertex(final Object id, final String label, final TinkerGraph graph) {
         super(id, label, graph);
     }
 
     @Override
-    public <V> Property<V> property(final String key, final V value) {
-        if (this.graph.graphView != null && this.graph.graphView.getInUse()) {
-            return this.graph.graphView.setProperty(this, key, value);
+    public <V> VertexProperty<V> property(final String key) {
+        if (TinkerHelper.inComputerMode(this.graph)) {
+            final List<VertexProperty> list = (List) this.graph.graphView.getProperty(this, key);
+            if (list.size() == 0)
+                return VertexProperty.<V>empty();
+            else if (list.size() == 1)
+                return list.get(0);
+            else
+                throw Vertex.Exceptions.multiplePropertiesExistForProvidedKey(key);
         } else {
-            ElementHelper.validateProperty(key, value);
-            final Property oldProperty = super.property(key);
-            final Property newProperty = new TinkerProperty<>(this, key, value);
-            this.properties.put(key, newProperty);
-            this.graph.vertexIndex.autoUpdate(key, value, oldProperty.isPresent() ? oldProperty.value() : null, this);
-            return newProperty;
+            if (this.properties.containsKey(key)) {
+                final List<VertexProperty> list = (List) this.properties.get(key);
+                if (list.size() > 1)
+                    throw Vertex.Exceptions.multiplePropertiesExistForProvidedKey(key);
+                else
+                    return list.get(0);
+            } else
+                return VertexProperty.<V>empty();
         }
     }
 
-    public String toString() {
-        return StringFactory.vertexString(this);
+    @Override
+    public <V> VertexProperty<V> property(final String key, final V value) {
+        return this.property(key, value, EMPTY_ARGS);
+    }
+
+    @Override
+    public <V> VertexProperty<V> property(final String key, final V value, final Object... keyValues) {
+        ElementHelper.legalPropertyKeyValueArray(keyValues);
+        final Optional<Object> optionalId = ElementHelper.getIdValue(keyValues);
+        if (TinkerHelper.inComputerMode(this.graph)) {
+            VertexProperty<V> vertexProperty = (VertexProperty<V>) this.graph.graphView.setProperty(this, key, value);
+            ElementHelper.attachProperties(vertexProperty, keyValues);
+            return vertexProperty;
+        } else {
+            ElementHelper.validateProperty(key, value);
+            final VertexProperty<V> vertexProperty = optionalId.isPresent() ?
+                    new TinkerVertexProperty<V>(optionalId.get(), this, key, value) :
+                    new TinkerVertexProperty<V>(this, key, value);
+            final List<Property> list = this.properties.getOrDefault(key, new ArrayList<>());
+            list.add(vertexProperty);
+            this.properties.put(key, list);
+            this.graph.vertexIndex.autoUpdate(key, value, null, this);
+            ElementHelper.attachProperties(vertexProperty, keyValues);
+            return vertexProperty;
+        }
     }
 
     @Override
@@ -51,13 +87,13 @@ public class TinkerVertex extends TinkerElement implements Vertex {
 
     @Override
     public void remove() {
-        this.bothE().forEach(Edge::remove);
-        this.properties().clear();
+        final List<Edge> edges = new ArrayList<>();
+        this.iterators().edgeIterator(Direction.BOTH, Integer.MAX_VALUE).forEachRemaining(edges::add);
+        edges.forEach(Edge::remove);
+        this.properties.clear();
         this.graph.vertexIndex.removeElement(this);
         this.graph.vertices.remove(this.id);
     }
-
-    //////////////////////
 
     @Override
     public GraphTraversal<Vertex, Vertex> start() {
@@ -65,12 +101,34 @@ public class TinkerVertex extends TinkerElement implements Vertex {
     }
 
     @Override
-    public Iterator<Edge> edges(final Direction direction, final int branchFactor, final String... labels) {
-        return (Iterator) TinkerHelper.getEdges(this, direction, branchFactor, labels);
+    public String toString() {
+        return StringFactory.vertexString(this);
+    }
+
+    //////////////////////////////////////////////
+
+    @Override
+    public Vertex.Iterators iterators() {
+        return this;
     }
 
     @Override
-    public Iterator<Vertex> vertices(final Direction direction, final int branchFactor, final String... labels) {
-        return (Iterator) TinkerHelper.getVertices(this, direction, branchFactor, labels);
+    public <V> Iterator<VertexProperty<V>> propertyIterator(final String... propertyKeys) {
+        return (Iterator) super.propertyIterator(propertyKeys);
+    }
+
+    @Override
+    public <V> Iterator<VertexProperty<V>> hiddenPropertyIterator(final String... propertyKeys) {
+        return (Iterator) super.hiddenPropertyIterator(propertyKeys);
+    }
+
+    @Override
+    public Iterator<Edge> edgeIterator(final Direction direction, final int branchFactor, final String... labels) {
+        return (Iterator) TinkerHelper.getEdges(TinkerVertex.this, direction, branchFactor, labels);
+    }
+
+    @Override
+    public Iterator<Vertex> vertexIterator(final Direction direction, final int branchFactor, final String... labels) {
+        return (Iterator) TinkerHelper.getVertices(TinkerVertex.this, direction, branchFactor, labels);
     }
 }

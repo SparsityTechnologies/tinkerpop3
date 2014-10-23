@@ -8,7 +8,7 @@ import com.tinkerpop.gremlin.process.util.TraversalHelper;
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class TraverserSourceStrategy implements TraversalStrategy {
+public class TraverserSourceStrategy extends AbstractTraversalStrategy implements TraversalStrategy {
 
     private static final TraverserSourceStrategy INSTANCE = new TraverserSourceStrategy();
 
@@ -16,7 +16,7 @@ public class TraverserSourceStrategy implements TraversalStrategy {
     }
 
     @Override
-    public void apply(final Traversal traversal) {
+    public void apply(final Traversal<?,?> traversal) {
         final boolean trackPaths = TraversalHelper.trackPaths(traversal);
         traversal.getSteps().forEach(step -> {
             if (step instanceof TraverserSource)

@@ -1,9 +1,12 @@
 package com.tinkerpop.gremlin.structure.util.batch;
 
+import com.tinkerpop.gremlin.process.T;
 import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.process.Traverser;
 import com.tinkerpop.gremlin.process.computer.GraphComputer;
+import com.tinkerpop.gremlin.process.graph.ElementTraversal;
 import com.tinkerpop.gremlin.process.graph.GraphTraversal;
+import com.tinkerpop.gremlin.process.graph.VertexTraversal;
 import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Element;
@@ -11,12 +14,11 @@ import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Transaction;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.VertexProperty;
 import com.tinkerpop.gremlin.structure.util.ElementHelper;
 import com.tinkerpop.gremlin.structure.util.batch.cache.VertexCache;
-import com.tinkerpop.gremlin.util.function.SConsumer;
 
 import java.util.Iterator;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
@@ -48,13 +50,13 @@ import java.util.function.Function;
  * @author Matthias Broecheler (http://www.matthiasb.com)
  * @author Stephen Mallette (http://stephen.genoprime.com)
  */
-public class BatchGraph<T extends Graph> implements Graph {
+public class BatchGraph<G extends Graph> implements Graph {
     /**
      * Default buffer size
      */
     public static final long DEFAULT_BUFFER_SIZE = 10000;
 
-    private final T baseGraph;
+    private final G baseGraph;
 
     private final String vertexIdKey;
     private final String edgeIdKey;
@@ -89,7 +91,7 @@ public class BatchGraph<T extends Graph> implements Graph {
      * @param bufferSize Defines the number of vertices and edges loaded before starting a new transaction. The
      *                   larger this value, the more sideEffects is required but the faster the loading process.
      */
-    private BatchGraph(final T graph, final VertexIdType type, final long bufferSize, final String vertexIdKey,
+    private BatchGraph(final G graph, final VertexIdType type, final long bufferSize, final String vertexIdKey,
                        final String edgeIdKey, final boolean incrementalLoading,
                        final BiConsumer<Element, Object[]> existingVertexStrategy,
                        final BiConsumer<Element, Object[]> existingEdgeStrategy) {
@@ -144,15 +146,15 @@ public class BatchGraph<T extends Graph> implements Graph {
             throw new IllegalArgumentException("Vertex id already exists");
         nextElement();
 
-        // if the vertexIdKey is not the Element.ID then append it as a name/value pair.  this will overwrite what
+        // if the vertexIdKey is not the T.id then append it as a name/value pair.  this will overwrite what
         // is present in that field already
-        final Object[] keysVals = Element.ID.equals(vertexIdKey) ? keyValues : ElementHelper.upsert(keyValues, vertexIdKey, id);
+        final Object[] keysVals = T.id.getAccessor().equals(vertexIdKey) ? keyValues : ElementHelper.upsert(keyValues, vertexIdKey, id);
 
-        // if the graph doesn't support vertex ids or the vertex id is not the Element.ID then remove that key
+        // if the graph doesn't support vertex ids or the vertex id is not the T.id then remove that key
         // value pair as it will foul up insertion (i.e. an exception for graphs that don't support it and the
         // id will become the value of the vertex id which might not be expected.
-        final Optional<Object[]> kvs = this.baseSupportsSuppliedVertexId && Element.ID.equals(vertexIdKey) ?
-                Optional.ofNullable(keyValues) : ElementHelper.remove(Element.ID, keysVals);
+        final Optional<Object[]> kvs = this.baseSupportsSuppliedVertexId && T.id.getAccessor().equals(vertexIdKey) ?
+                Optional.ofNullable(keyValues) : ElementHelper.remove(T.id, keysVals);
 
         Vertex currentVertex;
         if (!incrementalLoading)
@@ -332,7 +334,7 @@ public class BatchGraph<T extends Graph> implements Graph {
         }
     }
 
-    private class BatchVertex implements Vertex {
+    private class BatchVertex implements Vertex, Vertex.Iterators, VertexTraversal {
 
         private final Object externalID;
 
@@ -353,21 +355,21 @@ public class BatchGraph<T extends Graph> implements Graph {
             previousOutVertexId = externalID;  //keep track of the previous out vertex id
 
             if (!incrementalLoading) {
-                final Optional<Object[]> kvs = baseSupportsSuppliedEdgeId && Element.ID.equals(edgeIdKey) ?
-                        Optional.ofNullable(keyValues) : ElementHelper.remove(Element.ID, keyValues);
+                final Optional<Object[]> kvs = baseSupportsSuppliedEdgeId && T.id.getAccessor().equals(edgeIdKey) ?
+                        Optional.ofNullable(keyValues) : ElementHelper.remove(T.id, keyValues);
                 currentEdgeCached = kvs.isPresent() ? ov.addEdge(label, iv, kvs.get()) : ov.addEdge(label, iv);
             } else {
                 final Optional<Object> id = ElementHelper.getIdValue(keyValues);
                 // if the edgeIdKey is not the Element.ID then append it as a name/value pair.  this will overwrite what
                 // is present in that field already
-                final Object[] keysVals = id.isPresent() && Element.ID.equals(edgeIdKey) ? keyValues :
+                final Object[] keysVals = id.isPresent() && T.id.getAccessor().equals(edgeIdKey) ? keyValues :
                         id.isPresent() ? ElementHelper.upsert(keyValues, edgeIdKey, id.get()) : keyValues;
 
                 // if the graph doesn't support edge ids or the edge id is not the Element.ID then remove that key
                 // value pair as it will foul up insertion (i.e. an exception for graphs that don't support it and the
                 // id will become the value of the edge id which might not be expected.
-                final Optional<Object[]> kvs = baseSupportsSuppliedEdgeId && Element.ID.equals(edgeIdKey) ?
-                        Optional.ofNullable(keyValues) : ElementHelper.remove(Element.ID, keysVals);
+                final Optional<Object[]> kvs = baseSupportsSuppliedEdgeId && T.id.getAccessor().equals(edgeIdKey) ?
+                        Optional.ofNullable(keyValues) : ElementHelper.remove(T.id, keysVals);
 
                 if (id.isPresent()) {
                     final Traversal<Edge, Edge> traversal = baseGraph.E().has(edgeIdKey, id.get());
@@ -394,6 +396,11 @@ public class BatchGraph<T extends Graph> implements Graph {
         }
 
         @Override
+        public Graph graph() {
+            return getCachedVertex(externalID).graph();
+        }
+
+        @Override
         public String label() {
             return getCachedVertex(externalID).label();
         }
@@ -409,28 +416,13 @@ public class BatchGraph<T extends Graph> implements Graph {
         }
 
         @Override
-        public Map<String, Property> properties() {
-            return getCachedVertex(externalID).properties();
-        }
-
-        @Override
-        public Map<String, Property> hiddens() {
-            return getCachedVertex(externalID).hiddens();
-        }
-
-        @Override
-        public <V> Property<V> property(final String key) {
+        public <V> VertexProperty<V> property(final String key) {
             return getCachedVertex(externalID).property(key);
         }
 
         @Override
-        public <V> Property<V> property(final String key, final V value) {
+        public <V> VertexProperty<V> property(final String key, final V value) {
             return getCachedVertex(externalID).property(key, value);
-        }
-
-        @Override
-        public void properties(final Object... keyValues) {
-            getCachedVertex(externalID).properties(keyValues);
         }
 
         @Override
@@ -438,25 +430,6 @@ public class BatchGraph<T extends Graph> implements Graph {
             return getCachedVertex(externalID).value(key);
         }
 
-        @Override
-        public GraphTraversal<Vertex, Vertex> with(final Object... sideEffectKeyValues) {
-            throw retrievalNotSupported();
-        }
-
-        @Override
-        public GraphTraversal<Vertex, Vertex> sideEffect(final SConsumer<Traverser<Vertex>> consumer) {
-            throw retrievalNotSupported();
-        }
-
-        @Override
-        public Iterator<Edge> edges(final Direction direction, final int branchFactor, final String... labels) {
-            throw retrievalNotSupported();
-        }
-
-        @Override
-        public Iterator<Vertex> vertices(final Direction direction, final int branchFactor, final String... labels) {
-            throw retrievalNotSupported();
-        }
 
         @Override
         public GraphTraversal<Vertex, Vertex> start() {
@@ -464,21 +437,36 @@ public class BatchGraph<T extends Graph> implements Graph {
         }
 
         @Override
-        public GraphTraversal<Vertex, Vertex> as(final String label) {
+        public Vertex.Iterators iterators() {
+            return this;
+        }
+
+        @Override
+        public Iterator<Edge> edgeIterator(final Direction direction, final int branchFactor, final String... labels) {
             throw retrievalNotSupported();
         }
 
         @Override
-        public GraphTraversal<Vertex, Vertex> identity() {
+        public Iterator<Vertex> vertexIterator(final Direction direction, final int branchFactor, final String... labels) {
             throw retrievalNotSupported();
+        }
+
+        @Override
+        public <V> Iterator<VertexProperty<V>> propertyIterator(final String... propertyKeys) {
+            return getCachedVertex(externalID).iterators().propertyIterator(propertyKeys);
+        }
+
+        @Override
+        public <V> Iterator<VertexProperty<V>> hiddenPropertyIterator(final String... propertyKeys) {
+            return getCachedVertex(externalID).iterators().hiddenPropertyIterator(propertyKeys);
         }
     }
 
-    private class BatchEdge implements Edge {
+    private class BatchEdge implements Edge, Edge.Iterators {
 
         @Override
-        public Iterator<Vertex> vertices(final Direction direction) {
-            return getWrappedEdge().vertices(direction);
+        public Graph graph() {
+            return getWrappedEdge().graph();
         }
 
         @Override
@@ -497,16 +485,6 @@ public class BatchGraph<T extends Graph> implements Graph {
         }
 
         @Override
-        public Map<String, Property> properties() {
-            return getWrappedEdge().properties();
-        }
-
-        @Override
-        public Map<String, Property> hiddens() {
-            return getWrappedEdge().hiddens();
-        }
-
-        @Override
         public <V> Property<V> property(final String key) {
             return getWrappedEdge().property(key);
         }
@@ -522,11 +500,6 @@ public class BatchGraph<T extends Graph> implements Graph {
         }
 
         @Override
-        public void properties(final Object... keyValues) {
-            getWrappedEdge().properties(keyValues);
-        }
-
-        @Override
         public <V> V value(final String key) throws NoSuchElementException {
             return getWrappedEdge().value(key);
         }
@@ -536,6 +509,26 @@ public class BatchGraph<T extends Graph> implements Graph {
                 throw new UnsupportedOperationException("This edge is no longer in scope");
             }
             return currentEdgeCached;
+        }
+
+        @Override
+        public Edge.Iterators iterators() {
+            return this;
+        }
+
+        @Override
+        public <V> Iterator<Property<V>> propertyIterator(final String... propertyKeys) {
+            return getWrappedEdge().iterators().propertyIterator(propertyKeys);
+        }
+
+        @Override
+        public <V> Iterator<Property<V>> hiddenPropertyIterator(final String... propertyKeys) {
+            return getWrappedEdge().iterators().hiddenPropertyIterator(propertyKeys);
+        }
+
+        @Override
+        public Iterator<Vertex> vertexIterator(final Direction direction) {
+            return getWrappedEdge().iterators().vertexIterator(direction);
         }
     }
 
@@ -547,17 +540,17 @@ public class BatchGraph<T extends Graph> implements Graph {
         return new UnsupportedOperationException("Removal operations are not supported during batch loading");
     }
 
-    public static class Builder<T extends Graph> {
-        private final T graphToLoad;
+    public static class Builder<G extends Graph> {
+        private final G graphToLoad;
         private boolean incrementalLoading = false;
-        private String vertexIdKey = Element.ID;
-        private String edgeIdKey = Element.ID;
+        private String vertexIdKey = T.id.getAccessor();
+        private String edgeIdKey = T.id.getAccessor();
         private long bufferSize = DEFAULT_BUFFER_SIZE;
         private VertexIdType vertexIdType = VertexIdType.OBJECT;
         private BiConsumer<Element, Object[]> existingVertexStrategy = Exists.IGNORE;
         private BiConsumer<Element, Object[]> existingEdgeStrategy = Exists.IGNORE;
 
-        private Builder(final T g) {
+        private Builder(final G g) {
             if (null == g) throw new IllegalArgumentException("Graph may not be null");
             if (g instanceof BatchGraph)
                 throw new IllegalArgumentException("BatchGraph cannot wrap another BatchGraph instance");
@@ -566,7 +559,7 @@ public class BatchGraph<T extends Graph> implements Graph {
 
         /**
          * Sets the key to be used when setting the vertex id as a property on the respective vertex. If this
-         * value is not set it defaults to {@link Element#ID}.
+         * value is not set it defaults to {@link T#id}.
          *
          * @param key Key to be used.
          */
@@ -607,12 +600,12 @@ public class BatchGraph<T extends Graph> implements Graph {
          * Sets whether the graph loaded through this instance of {@link BatchGraph} is loaded from scratch
          * (i.e. the wrapped graph is initially empty) or whether graph is loaded incrementally into an
          * existing graph.
-         * <p>
+         * <p/>
          * In the former case, BatchGraph does not need to check for the existence of vertices with the wrapped
          * graph but only needs to consult its own cache which can be significantly faster. In the latter case,
          * the cache is checked first but an additional check against the wrapped graph may be necessary if
          * the vertex does not exist.
-         * <p>
+         * <p/>
          * By default, BatchGraph assumes that the data is loaded from scratch.
          */
         public Builder incrementalLoading(final boolean incrementalLoading) {
@@ -624,12 +617,12 @@ public class BatchGraph<T extends Graph> implements Graph {
          * Sets whether the graph loaded through this instance of {@link BatchGraph} is loaded from scratch
          * (i.e. the wrapped graph is initially empty) or whether graph is loaded incrementally into an
          * existing graph.
-         * <p>
+         * <p/>
          * In the former case, BatchGraph does not need to check for the existence of vertices with the wrapped
          * graph but only needs to consult its own cache which can be significantly faster. In the latter case,
          * the cache is checked first but an additional check against the wrapped graph may be necessary if
          * the vertex does not exist.
-         * <p>
+         * <p/>
          * By default, BatchGraph assumes that the data is loaded from scratch.
          */
         public Builder incrementalLoading(final boolean incrementalLoading,
@@ -641,7 +634,7 @@ public class BatchGraph<T extends Graph> implements Graph {
             return this;
         }
 
-        public BatchGraph<T> create() {
+        public BatchGraph<G> create() {
             return new BatchGraph<>(graphToLoad, vertexIdType, bufferSize, vertexIdKey, edgeIdKey,
                     incrementalLoading, this.existingVertexStrategy, this.existingEdgeStrategy);
         }

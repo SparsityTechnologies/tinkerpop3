@@ -5,25 +5,30 @@ import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.util.ElementHelper;
 import com.tinkerpop.gremlin.structure.util.wrapped.WrappedElement;
-import org.javatuples.Pair;
+import com.tinkerpop.gremlin.util.StreamFactory;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.PropertyContainer;
 import org.neo4j.graphdb.Relationship;
 
 import java.util.HashSet;
-import java.util.Map;
+import java.util.Iterator;
 import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * @author Stephen Mallette (http://stephen.genoprime.com)
  */
-public abstract class Neo4jElement implements Element, WrappedElement<PropertyContainer> {
+public abstract class Neo4jElement implements Element, Element.Iterators, WrappedElement<PropertyContainer> {
     protected final Neo4jGraph graph;
     protected PropertyContainer baseElement;
 
     public Neo4jElement(final Neo4jGraph graph) {
         this.graph = graph;
+    }
+
+    @Override
+    public Graph graph() {
+        return this.graph;
     }
 
     @Override
@@ -33,31 +38,6 @@ public abstract class Neo4jElement implements Element, WrappedElement<PropertyCo
             return ((Node) this.baseElement).getId();
         else
             return ((Relationship) this.baseElement).getId();
-    }
-
-    @Override
-    public String label() {
-        this.graph.tx().readWrite();
-        if (this.baseElement instanceof Node)
-            return ((Node) this.baseElement).getLabels().iterator().next().name();
-        else
-            return ((Relationship) this.baseElement).getType().name();
-    }
-
-    @Override
-    public Map<String, Property> properties() {
-        this.graph.tx().readWrite();
-        return keys().stream()
-                .map(key -> Pair.<String, Property>with(key, new Neo4jProperty<>(this, key, this.baseElement.getProperty(key))))
-                .collect(Collectors.toMap(kv -> kv.getValue0(), kv -> kv.getValue1()));
-    }
-
-    @Override
-    public Map<String, Property> hiddens() {
-        this.graph.tx().readWrite();
-        return hiddenKeys().stream()
-                .map(key -> Pair.<String, Property>with(key, new Neo4jProperty<>(this, key, this.baseElement.getProperty(Graph.Key.hide(key)))))
-                .collect(Collectors.toMap(kv -> kv.getValue0(), kv -> kv.getValue1()));
     }
 
     @Override
@@ -85,11 +65,14 @@ public abstract class Neo4jElement implements Element, WrappedElement<PropertyCo
     @Override
     public <V> Property<V> property(final String key) {
         this.graph.tx().readWrite();
-
-        if (this.baseElement.hasProperty(key))
-            return new Neo4jProperty<>(this, key, (V) this.baseElement.getProperty(key));
-        else
-            return Property.empty();
+        try {
+            if (this.baseElement.hasProperty(key))
+                return new Neo4jProperty<>(this, key, (V) this.baseElement.getProperty(key));
+            else
+                return Property.empty();
+        } catch (IllegalStateException ise) {
+            return Property.<V>empty();
+        }
     }
 
     @Override
@@ -105,10 +88,12 @@ public abstract class Neo4jElement implements Element, WrappedElement<PropertyCo
         }
     }
 
+    @Override
     public boolean equals(final Object object) {
         return ElementHelper.areEqual(this, object);
     }
 
+    @Override
     public int hashCode() {
         return this.id().hashCode();
     }
@@ -116,5 +101,23 @@ public abstract class Neo4jElement implements Element, WrappedElement<PropertyCo
     @Override
     public PropertyContainer getBaseElement() {
         return this.baseElement;
+    }
+
+    @Override
+    public <V> Iterator<? extends Property<V>> propertyIterator(final String... propertyKeys) {
+        graph.tx().readWrite();
+        return StreamFactory.stream(baseElement.getPropertyKeys())
+                .filter(key -> propertyKeys.length == 0 || Stream.of(propertyKeys).filter(k -> k.equals(key)).findAny().isPresent())
+                .filter(key -> !Graph.Key.isHidden(key))
+                .map(key -> new Neo4jProperty<>(Neo4jElement.this, key, (V) baseElement.getProperty(key))).iterator();
+    }
+
+    @Override
+    public <V> Iterator<? extends Property<V>> hiddenPropertyIterator(final String... propertyKeys) {
+        graph.tx().readWrite();
+        return StreamFactory.stream(baseElement.getPropertyKeys())
+                .filter(Graph.Key::isHidden)
+                .filter(key -> propertyKeys.length == 0 || Stream.of(propertyKeys).filter(k -> k.equals(Graph.Key.unHide(key))).findAny().isPresent())
+                .map(key -> new Neo4jProperty<>(Neo4jElement.this, key, (V) baseElement.getProperty(key))).iterator();
     }
 }

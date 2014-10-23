@@ -11,7 +11,7 @@ import java.util.Set;
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class GiraphImmutableMemory implements Memory {
+public final class GiraphImmutableMemory implements Memory {
 
     private long runtime = 0l;
     private int iteration = -1;
@@ -51,8 +51,8 @@ public class GiraphImmutableMemory implements Memory {
     protected void complete(final long runtime) {
         this.complete = true;
         this.runtime = runtime;
-        if (this.memoryMap.containsKey(Constants.ITERATION))
-            this.iteration = (int) this.memoryMap.remove(Constants.ITERATION);
+        if (this.memoryMap.containsKey(Constants.SYSTEM_ITERATION))
+            this.iteration = (int) this.memoryMap.remove(Constants.SYSTEM_ITERATION);
     }
 
     @Override
@@ -71,6 +71,6 @@ public class GiraphImmutableMemory implements Memory {
     }
 
     public String toString() {
-        return StringFactory.computeMemoryString(this);
+        return StringFactory.memoryString(this);
     }
 }

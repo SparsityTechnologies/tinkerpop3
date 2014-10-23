@@ -10,7 +10,6 @@ import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Vertex;
 import com.tinkerpop.gremlin.structure.util.ElementHelper;
 import com.tinkerpop.gremlin.structure.util.GraphFactory;
-import com.tinkerpop.gremlin.util.function.SPredicate;
 import org.javatuples.Pair;
 
 import java.util.Collections;
@@ -19,15 +18,17 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * A side-effect step that produces an edge induced subgraph.
  *
  * @author Stephen Mallette (http://stephen.genoprime.com)
  */
-public class SubgraphStep<S> extends SideEffectStep<S> implements SideEffectCapable, PathConsumer, Reversible {
-    private final Graph subgraph;
-    private final boolean subgraphSupportsUserIds;
+public final class SubgraphStep<S> extends SideEffectStep<S> implements SideEffectCapable, PathConsumer, Reversible {
+    private Graph subgraph;
+    private Boolean subgraphSupportsUserIds;
+
     private final Map<Object, Vertex> idVertexMap;
     private final Set<Object> edgeIdsAdded;
     private final String sideEffectKey;
@@ -40,17 +41,18 @@ public class SubgraphStep<S> extends SideEffectStep<S> implements SideEffectCapa
     public SubgraphStep(final Traversal traversal, final String sideEffectKey,
                         final Set<Object> edgeIdHolder,
                         final Map<Object, Vertex> idVertexMap,
-                        final SPredicate<Edge> includeEdge) {
+                        final Predicate<Edge> includeEdge) {
         super(traversal);
         this.sideEffectKey = null == sideEffectKey ? this.getLabel() : sideEffectKey;
         this.edgeIdsAdded = null == edgeIdHolder ? new HashSet<>() : edgeIdHolder;
         this.idVertexMap = null == idVertexMap ? new HashMap<>() : idVertexMap;
-        TraversalHelper.verifySideEffectKeyIsNotAStepLabel(this.sideEffectKey, this.traversal);
-        this.subgraph = this.traversal.sideEffects().getOrCreate(this.sideEffectKey, () -> GraphFactory.open(DEFAULT_CONFIGURATION));
-        this.subgraphSupportsUserIds = this.subgraph.features().vertex().supportsUserSuppliedIds();
-
+        this.traversal.sideEffects().registerSupplierIfAbsent(this.sideEffectKey, () -> GraphFactory.open(DEFAULT_CONFIGURATION));
         this.setConsumer(traverser -> {
-            traverser.getPath().stream().map(Pair::getValue1)
+            if (null == this.subgraph) {
+                this.subgraph = this.getTraversal().sideEffects().get(this.sideEffectKey);
+                this.subgraphSupportsUserIds = this.subgraph.features().vertex().supportsUserSuppliedIds();
+            }
+            traverser.path().stream().map(Pair::getValue1)
                     .filter(i -> i instanceof Edge)
                     .map(e -> (Edge) e)
                     .filter(e -> !this.edgeIdsAdded.contains(e.id()))
@@ -58,7 +60,7 @@ public class SubgraphStep<S> extends SideEffectStep<S> implements SideEffectCapa
                     .forEach(e -> {
                         final Vertex newVOut = getOrCreateVertex(e.outV().next());
                         final Vertex newVIn = getOrCreateVertex(e.inV().next());
-                        newVOut.addEdge(e.label(), newVIn, ElementHelper.getProperties(e, this.subgraphSupportsUserIds, false, Collections.emptySet(), Collections.emptySet()));
+                        newVOut.addEdge(e.label(), newVIn, ElementHelper.getProperties(e, subgraphSupportsUserIds, false, Collections.emptySet(), Collections.emptySet()));
                         // TODO: If userSuppliedIds exist, don't do this to save sideEffects
                         this.edgeIdsAdded.add(e.id());
                     });
@@ -92,6 +94,6 @@ public class SubgraphStep<S> extends SideEffectStep<S> implements SideEffectCapa
 
     @Override
     public String toString() {
-        return Graph.Key.isHidden(this.sideEffectKey) ? super.toString() : TraversalHelper.makeStepString(this, this.sideEffectKey);
+        return Graph.System.isSystem(this.sideEffectKey) ? super.toString() : TraversalHelper.makeStepString(this, this.sideEffectKey);
     }
 }

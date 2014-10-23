@@ -1,58 +1,63 @@
 package com.tinkerpop.gremlin.process.computer.lambda;
 
-import com.tinkerpop.gremlin.process.computer.GraphComputer;
-import com.tinkerpop.gremlin.process.computer.Messenger;
 import com.tinkerpop.gremlin.process.computer.Memory;
+import com.tinkerpop.gremlin.process.computer.Messenger;
 import com.tinkerpop.gremlin.process.computer.VertexProgram;
-import com.tinkerpop.gremlin.process.computer.util.AbstractBuilder;
+import com.tinkerpop.gremlin.process.computer.util.AbstractVertexProgramBuilder;
+import com.tinkerpop.gremlin.process.computer.util.LambdaHolder;
 import com.tinkerpop.gremlin.process.computer.util.VertexProgramHelper;
 import com.tinkerpop.gremlin.structure.Vertex;
-import com.tinkerpop.gremlin.util.function.SConsumer;
-import com.tinkerpop.gremlin.util.function.SPredicate;
-import com.tinkerpop.gremlin.util.function.STriConsumer;
+import com.tinkerpop.gremlin.structure.util.StringFactory;
+import com.tinkerpop.gremlin.util.function.TriConsumer;
 import org.apache.commons.configuration.Configuration;
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
 public class LambdaVertexProgram<M extends Serializable> implements VertexProgram<M> {
 
-    private static final String SETUP_LAMBDA_KEY = "gremlin.lambdaVertexProgram.setupLambdaKey";
-    private static final String EXECUTE_LAMBDA_KEY = "gremlin.lambdaVertexProgram.executeLambdaKey";
-    private static final String TERMINATE_LAMBDA_KEY = "gremlin.lambdaVertexProgram.terminateLambdaKey";
+    private static final String SETUP_LAMBDA = "gremlin.lambdaVertexProgram.setupLambda";
+    private static final String EXECUTE_LAMBDA = "gremlin.lambdaVertexProgram.executeLambda";
+    private static final String TERMINATE_LAMBDA = "gremlin.lambdaVertexProgram.terminateLambda";
     private static final String ELEMENT_COMPUTE_KEYS = "gremlin.lambdaVertexProgram.elementComputeKeys";
-    private static final String MEMORY_KEYS = "gremlin.lambdaVertexProgram.memoryKeys";
+    private static final String MEMORY_COMPUTE_KEYS = "gremlin.lambdaVertexProgram.memoryComputeKeys";
 
-    private SConsumer<Memory> setupLambda;
-    private STriConsumer<Vertex, Messenger<M>, Memory> executeLambda;
-    private SPredicate<Memory> terminateLambda;
-    private Map<String, KeyType> elementComputeKeys;
-    private Set<String> memoryKeys;
+    private LambdaHolder<Consumer<Memory>> setupLambdaHolder;
+    private Consumer<Memory> setupLambda;
+    private LambdaHolder<TriConsumer<Vertex, Messenger<M>, Memory>> executeLambdaHolder;
+    private TriConsumer<Vertex, Messenger<M>, Memory> executeLambda;
+    private LambdaHolder<Predicate<Memory>> terminateLambdaHolder;
+    private Predicate<Memory> terminateLambda;
+    private Set<String> elementComputeKeys;
+    private Set<String> memoryComputeKeys;
 
     private LambdaVertexProgram() {
     }
 
     @Override
     public void loadState(final Configuration configuration) {
+        this.setupLambdaHolder = LambdaHolder.loadState(configuration, SETUP_LAMBDA);
+        this.executeLambdaHolder = LambdaHolder.loadState(configuration, EXECUTE_LAMBDA);
+        this.terminateLambdaHolder = LambdaHolder.loadState(configuration, TERMINATE_LAMBDA);
+        this.setupLambda = null == this.setupLambdaHolder ? s -> {
+        } : this.setupLambdaHolder.get();
+        this.executeLambda = null == this.executeLambdaHolder ? (v, m, s) -> {
+        } : this.executeLambdaHolder.get();
+        this.terminateLambda = null == this.terminateLambdaHolder ? s -> true : this.terminateLambdaHolder.get();
+
         try {
-            this.setupLambda = configuration.containsKey(SETUP_LAMBDA_KEY) ?
-                    VertexProgramHelper.deserialize(configuration, SETUP_LAMBDA_KEY) : s -> {
-            };
-            this.executeLambda = configuration.containsKey(EXECUTE_LAMBDA_KEY) ?
-                    VertexProgramHelper.deserialize(configuration, EXECUTE_LAMBDA_KEY) : (v, m, s) -> {
-            };
-            this.terminateLambda = configuration.containsKey(TERMINATE_LAMBDA_KEY) ?
-                    VertexProgramHelper.deserialize(configuration, TERMINATE_LAMBDA_KEY) : s -> true;
             this.elementComputeKeys = configuration.containsKey(ELEMENT_COMPUTE_KEYS) ?
-                    VertexProgramHelper.deserialize(configuration, ELEMENT_COMPUTE_KEYS) : Collections.emptyMap();
-            this.memoryKeys = configuration.containsKey(MEMORY_KEYS) ?
-                    VertexProgramHelper.deserialize(configuration, MEMORY_KEYS) : Collections.emptySet();
+                    VertexProgramHelper.deserialize(configuration, ELEMENT_COMPUTE_KEYS) : Collections.emptySet();
+            this.memoryComputeKeys = configuration.containsKey(MEMORY_COMPUTE_KEYS) ?
+                    VertexProgramHelper.deserialize(configuration, MEMORY_COMPUTE_KEYS) : Collections.emptySet();
         } catch (Exception e) {
             throw new IllegalStateException(e.getMessage(), e);
         }
@@ -60,13 +65,17 @@ public class LambdaVertexProgram<M extends Serializable> implements VertexProgra
 
     @Override
     public void storeState(final Configuration configuration) {
-        configuration.setProperty(GraphComputer.VERTEX_PROGRAM, this.getClass().getName());
+        configuration.setProperty(VERTEX_PROGRAM, this.getClass().getName());
+        if (null != this.setupLambdaHolder)
+            this.setupLambdaHolder.storeState(configuration);
+        if (null != this.executeLambdaHolder)
+            this.executeLambdaHolder.storeState(configuration);
+        if (null != this.terminateLambdaHolder)
+            this.terminateLambdaHolder.storeState(configuration);
+
         try {
-            VertexProgramHelper.serialize(this.setupLambda, configuration, SETUP_LAMBDA_KEY);
-            VertexProgramHelper.serialize(this.executeLambda, configuration, EXECUTE_LAMBDA_KEY);
-            VertexProgramHelper.serialize(this.terminateLambda, configuration, TERMINATE_LAMBDA_KEY);
             VertexProgramHelper.serialize(this.elementComputeKeys, configuration, ELEMENT_COMPUTE_KEYS);
-            VertexProgramHelper.serialize(this.memoryKeys, configuration, MEMORY_KEYS);
+            VertexProgramHelper.serialize(this.memoryComputeKeys, configuration, MEMORY_COMPUTE_KEYS);
         } catch (Exception e) {
             throw new IllegalStateException(e.getMessage(), e);
         }
@@ -89,13 +98,18 @@ public class LambdaVertexProgram<M extends Serializable> implements VertexProgra
     }
 
     @Override
-    public Map<String, KeyType> getElementComputeKeys() {
+    public Set<String> getElementComputeKeys() {
         return this.elementComputeKeys;
     }
 
     @Override
     public Set<String> getMemoryComputeKeys() {
-        return this.memoryKeys;
+        return this.memoryComputeKeys;
+    }
+
+    @Override
+    public String toString() {
+        return StringFactory.vertexProgramString(this, ""); // TODO: make a better toString();
     }
 
     //////////////////////////////
@@ -104,60 +118,100 @@ public class LambdaVertexProgram<M extends Serializable> implements VertexProgra
         return new Builder();
     }
 
-    public static class Builder extends AbstractBuilder<Builder> {
+    public static class Builder extends AbstractVertexProgramBuilder<Builder> {
 
 
         private Builder() {
             super(LambdaVertexProgram.class);
         }
 
-        public Builder setup(final SConsumer<Memory> setupLambda) {
-            try {
-                VertexProgramHelper.serialize(setupLambda, configuration, SETUP_LAMBDA_KEY);
-                return this;
-            } catch (Exception e) {
-                throw new IllegalStateException(e.getMessage(), e);
-            }
+        public Builder setup(final Consumer<Memory> setupLambda) {
+            LambdaHolder.storeState(this.configuration, LambdaHolder.Type.OBJECT, SETUP_LAMBDA, setupLambda);
+            return this;
         }
 
-        public Builder execute(final STriConsumer<Vertex, Messenger, Memory> executeLambda) {
-            try {
-                VertexProgramHelper.serialize(executeLambda, configuration, EXECUTE_LAMBDA_KEY);
-                return this;
-            } catch (Exception e) {
-                throw new IllegalStateException(e.getMessage(), e);
-            }
+        public Builder setup(final Class<? extends Consumer<Memory>> setupClass) {
+            LambdaHolder.storeState(this.configuration, LambdaHolder.Type.CLASS, SETUP_LAMBDA, setupClass);
+            return this;
         }
 
-        public Builder terminate(final SPredicate<Memory> terminateLambda) {
-            try {
-                VertexProgramHelper.serialize(terminateLambda, configuration, TERMINATE_LAMBDA_KEY);
-                return this;
-            } catch (Exception e) {
-                throw new IllegalStateException(e.getMessage(), e);
-            }
+        public Builder setup(final String scriptEngine, final String setupScript) {
+            LambdaHolder.storeState(this.configuration, LambdaHolder.Type.SCRIPT, SETUP_LAMBDA, new String[]{scriptEngine, setupScript});
+            return this;
         }
 
-        public Builder elementComputeKeys(final Object... elementComputeKeys) {
-            try {
-                final Map<String, KeyType> map = new HashMap<>();
-                for (int i = 0; i < elementComputeKeys.length; i = i + 2) {
-                    map.put((String) elementComputeKeys[0], (KeyType) elementComputeKeys[1]);
-                }
-                VertexProgramHelper.serialize(map, configuration, ELEMENT_COMPUTE_KEYS);
-                return this;
-            } catch (Exception e) {
-                throw new IllegalStateException(e.getMessage(), e);
-            }
+        public Builder setup(final String setupScript) {
+            return setup(GREMLIN_GROOVY, setupScript);
         }
+
+        ///////
+
+        public Builder execute(final TriConsumer<Vertex, Messenger, Memory> executeLambda) {
+            LambdaHolder.storeState(this.configuration, LambdaHolder.Type.OBJECT, EXECUTE_LAMBDA, executeLambda);
+            return this;
+        }
+
+        public Builder execute(final Class<? extends TriConsumer<Vertex, Messenger, Memory>> executeClass) {
+            LambdaHolder.storeState(this.configuration, LambdaHolder.Type.CLASS, EXECUTE_LAMBDA, executeClass);
+            return this;
+        }
+
+        public Builder execute(final String scriptEngine, final String executeScript) {
+            LambdaHolder.storeState(this.configuration, LambdaHolder.Type.SCRIPT, EXECUTE_LAMBDA, new String[]{scriptEngine, executeScript});
+            return this;
+        }
+
+        public Builder execute(final String setupScript) {
+            return execute(GREMLIN_GROOVY, setupScript);
+        }
+
+        ///////
+
+        public Builder terminate(final Predicate<Memory> terminateLambda) {
+            LambdaHolder.storeState(this.configuration, LambdaHolder.Type.OBJECT, TERMINATE_LAMBDA, terminateLambda);
+            return this;
+        }
+
+        public Builder terminate(final Class<? extends Predicate<Memory>> terminateClass) {
+            LambdaHolder.storeState(this.configuration, LambdaHolder.Type.CLASS, TERMINATE_LAMBDA, terminateClass);
+            return this;
+        }
+
+        public Builder terminate(final String scriptEngine, final String terminateScript) {
+            LambdaHolder.storeState(this.configuration, LambdaHolder.Type.SCRIPT, TERMINATE_LAMBDA, new String[]{scriptEngine, terminateScript});
+            return this;
+        }
+
+        public Builder terminate(final String setupScript) {
+            return terminate(GREMLIN_GROOVY, setupScript);
+        }
+
+        ///////
 
         public Builder memoryComputeKeys(final Set<String> memoryComputeKeys) {
             try {
-                VertexProgramHelper.serialize(memoryComputeKeys, configuration, MEMORY_KEYS);
+                VertexProgramHelper.serialize(memoryComputeKeys, configuration, MEMORY_COMPUTE_KEYS);
                 return this;
             } catch (Exception e) {
                 throw new IllegalStateException(e.getMessage(), e);
             }
+        }
+
+        public Builder elementComputeKeys(final Set<String> elementComputeKeys) {
+            try {
+                VertexProgramHelper.serialize(elementComputeKeys, configuration, ELEMENT_COMPUTE_KEYS);
+                return this;
+            } catch (Exception e) {
+                throw new IllegalStateException(e.getMessage(), e);
+            }
+        }
+
+        public Builder memoryComputeKeys(final String... memoryComputeKeys) {
+            return this.memoryComputeKeys(new HashSet<>(Arrays.asList(memoryComputeKeys)));
+        }
+
+        public Builder elementComputeKeys(final String... elementComputeKeys) {
+            return this.elementComputeKeys(new HashSet<>(Arrays.asList(elementComputeKeys)));
         }
     }
 }

@@ -6,12 +6,13 @@ import com.tinkerpop.gremlin.giraph.process.computer.GiraphGraphComputer;
 import com.tinkerpop.gremlin.giraph.process.computer.GiraphMap;
 import com.tinkerpop.gremlin.giraph.process.computer.GiraphReduce;
 import com.tinkerpop.gremlin.giraph.structure.GiraphGraph;
-import com.tinkerpop.gremlin.process.computer.GraphComputer;
 import com.tinkerpop.gremlin.process.computer.MapReduce;
 import com.tinkerpop.gremlin.process.computer.Memory;
+import com.tinkerpop.gremlin.process.computer.VertexProgram;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.giraph.io.VertexInputFormat;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.OutputFormat;
@@ -32,13 +33,13 @@ public class MapReduceHelper {
 
     public static void executeMapReduceJob(final MapReduce mapReduce, final Memory memory, final Configuration configuration) throws IOException, ClassNotFoundException, InterruptedException {
         final Configuration newConfiguration = new Configuration(configuration);
-        final org.apache.commons.configuration.Configuration apacheConfiguration = new BaseConfiguration();
+        final BaseConfiguration apacheConfiguration = new BaseConfiguration();
         mapReduce.storeState(apacheConfiguration);
         ConfUtil.mergeApacheIntoHadoopConfiguration(apacheConfiguration, newConfiguration);
         if (!mapReduce.doStage(MapReduce.Stage.MAP)) {
-            final Path memoryPath = new Path(configuration.get(Constants.GREMLIN_OUTPUT_LOCATION) + "/" + mapReduce.getSideEffectKey());
+            final Path memoryPath = new Path(configuration.get(Constants.GREMLIN_OUTPUT_LOCATION) + "/" + mapReduce.getMemoryKey());
             if (newConfiguration.getClass(Constants.GREMLIN_MEMORY_OUTPUT_FORMAT_CLASS, SequenceFileOutputFormat.class, OutputFormat.class).equals(SequenceFileOutputFormat.class))
-                mapReduce.addSideEffectToMemory(memory, new KryoWritableIterator(configuration, memoryPath));
+                mapReduce.addResultToMemory(memory, new KryoWritableIterator(configuration, memoryPath));
             else
                 GiraphGraphComputer.LOGGER.warn(SEQUENCE_WARNING);
         } else {
@@ -60,17 +61,22 @@ public class MapReduceHelper {
             job.setInputFormatClass(ConfUtil.getInputFormatFromVertexInputFormat((Class) newConfiguration.getClass(Constants.GIRAPH_VERTEX_INPUT_FORMAT_CLASS, VertexInputFormat.class)));
             job.setOutputFormatClass(newConfiguration.getClass(Constants.GREMLIN_MEMORY_OUTPUT_FORMAT_CLASS, SequenceFileOutputFormat.class, OutputFormat.class)); // TODO: Make this configurable
             // if there is no vertex program, then grab the graph from the input location
-            final Path graphPath = configuration.get(GraphComputer.VERTEX_PROGRAM, null) != null ?
-                    new Path(newConfiguration.get(Constants.GREMLIN_OUTPUT_LOCATION) + "/" + Constants.HIDDEN_G) :
+            final Path graphPath = configuration.get(VertexProgram.VERTEX_PROGRAM, null) != null ?
+                    new Path(newConfiguration.get(Constants.GREMLIN_OUTPUT_LOCATION) + "/" + Constants.SYSTEM_G) :
                     new Path(newConfiguration.get(Constants.GREMLIN_INPUT_LOCATION));
-            final Path memoryPath = new Path(newConfiguration.get(Constants.GREMLIN_OUTPUT_LOCATION) + "/" + mapReduce.getSideEffectKey());
+            final Path memoryPath = new Path(newConfiguration.get(Constants.GREMLIN_OUTPUT_LOCATION) + "/" + mapReduce.getMemoryKey());
+            // necessary if store('a').out.out.store('a') exists twice -- TODO: only need to call the MapReduce once. May want to have a uniqueness critieria on MapReduce.
+            if(FileSystem.get(newConfiguration).exists(memoryPath)) {
+                FileSystem.get(newConfiguration).delete(memoryPath,true);
+            }
+
             FileInputFormat.setInputPaths(job, graphPath);
             FileOutputFormat.setOutputPath(job, memoryPath);
             job.waitForCompletion(true);
             // if its not a SequenceFile there is no certain way to convert to necessary Java objects.
             // to get results you have to look through HDFS directory structure. Oh the horror.
             if (newConfiguration.getClass(Constants.GREMLIN_MEMORY_OUTPUT_FORMAT_CLASS, SequenceFileOutputFormat.class, OutputFormat.class).equals(SequenceFileOutputFormat.class))
-                mapReduce.addSideEffectToMemory(memory, new KryoWritableIterator(configuration, memoryPath));
+                mapReduce.addResultToMemory(memory, new KryoWritableIterator(configuration, memoryPath));
             else
                 GiraphGraphComputer.LOGGER.warn(SEQUENCE_WARNING);
         }

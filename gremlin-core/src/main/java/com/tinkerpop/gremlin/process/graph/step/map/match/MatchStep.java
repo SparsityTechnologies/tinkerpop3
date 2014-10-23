@@ -8,7 +8,6 @@ import com.tinkerpop.gremlin.process.util.FastNoSuchElementException;
 import com.tinkerpop.gremlin.process.util.SingleIterator;
 import com.tinkerpop.gremlin.process.util.TraversalHelper;
 
-import java.io.Serializable;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,7 +25,7 @@ import java.util.function.Function;
 /**
  * @author Joshua Shinavier (http://fortytwo.net)
  */
-public class MatchStep<S, E> extends AbstractStep<S, Map<String, E>> {
+public final class MatchStep<S, E> extends AbstractStep<S, Map<String, E>> {
 
     static final BiConsumer<String, Object> TRIVIAL_CONSUMER = (s, t) -> {
     };
@@ -47,13 +46,13 @@ public class MatchStep<S, E> extends AbstractStep<S, Map<String, E>> {
     private int currentIndex;
 
     // initial value allows MatchStep to be used as a stand-alone query engine
-    private Traverser<S> currentStart;
+    private Traverser.Admin<S> currentStart;
 
     public MatchStep(final Traversal traversal, final String startLabel, final Traversal... traversals) {
         super(traversal);
         this.startLabel = startLabel;
         this.traversalsByStartAs = new HashMap<>();
-        this.currentStart = new SimpleTraverser<>(null);
+        this.currentStart = new SimpleTraverser<>(null, this.traversal.sideEffects());
         for (final Traversal tl : traversals) {
             addTraversalPrivate(tl);
         }
@@ -88,7 +87,7 @@ public class MatchStep<S, E> extends AbstractStep<S, Map<String, E>> {
         final BiConsumer<String, S> resultSetter = (name, value) -> map.put(name, (E) value);
 
         while (true) { // break out when the current solution is exhausted and there are no more starts
-            if (null == this.currentSolution || (this.currentIndex >= this.currentSolution.size() && this.currentSolution.isComplete())) {
+            if (null == this.currentSolution) {
                 if (this.starts.hasNext()) {
                     this.optimizeCounter = (this.optimizeCounter + 1) % this.startsPerOptimize;
                     if (0 == this.optimizeCounter) {
@@ -106,6 +105,8 @@ public class MatchStep<S, E> extends AbstractStep<S, Map<String, E>> {
             map.clear();
             if (this.currentSolution.visitSolution(this.currentIndex++, resultSetter)) {
                 return result;
+            } else {
+                this.currentSolution = null;
             }
         }
     }
@@ -363,7 +364,7 @@ public class MatchStep<S, E> extends AbstractStep<S, Map<String, E>> {
     // The position of a traversal in a query never changes, although its priority / likelihood of being executed does.
     // Priority in turn affects branch factor.
     // However, with sufficient inputs and optimizations,the branch factor is expected to converge on a stable value.
-    public static class TraversalWrapper<A, B> implements Comparable<TraversalWrapper<A, B>>, Serializable {
+    public static class TraversalWrapper<A, B> implements Comparable<TraversalWrapper<A, B>> {
         private final Traversal<A, B> traversal;
         private final String startLabel, endLabel;
         private int totalInputs = 0;
@@ -432,7 +433,7 @@ public class MatchStep<S, E> extends AbstractStep<S, Map<String, E>> {
                 outputs = 0;
             });
             Iterator<Traverser<A>> starts = new MapIterator<>(seIter,
-                    o -> start.makeChild(as, o));
+                    o -> ((Traverser.Admin<A>) start).makeChild(as, o));
 
             w.reset();
 

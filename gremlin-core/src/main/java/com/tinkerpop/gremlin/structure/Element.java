@@ -1,8 +1,9 @@
 package com.tinkerpop.gremlin.structure;
 
-import com.tinkerpop.gremlin.structure.util.ElementHelper;
+import com.tinkerpop.gremlin.util.StreamFactory;
 
-import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -16,9 +17,6 @@ import java.util.Set;
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
 public abstract interface Element {
-
-    public static final String ID = "id";
-    public static final String LABEL = "label";
 
     /**
      * Gets the unique identifier for the graph {@code Element}.
@@ -35,9 +33,11 @@ public abstract interface Element {
     public String label();
 
     /**
-     * Removes the {@code Element} from the graph.
+     * Get the graph that this element is within.
+     *
+     * @return the graph of this element
      */
-    public void remove();
+    public Graph graph();
 
     /**
      * Get the keys from non-hidden properties.
@@ -45,7 +45,9 @@ public abstract interface Element {
      * @return The non-hidden key set
      */
     public default Set<String> keys() {
-        return this.properties().keySet();
+        final Set<String> keys = new HashSet<>();
+        this.iterators().propertyIterator().forEachRemaining(property -> keys.add(property.key()));
+        return keys;
     }
 
     /**
@@ -54,59 +56,27 @@ public abstract interface Element {
      * @return The hidden key set
      */
     public default Set<String> hiddenKeys() {
-        return this.hiddens().keySet();
+        final Set<String> hiddenKeys = new HashSet<>();
+        this.iterators().hiddenPropertyIterator().forEachRemaining(property -> hiddenKeys.add(Graph.Key.unHide(property.key())));
+        return hiddenKeys;
     }
-
-    /**
-     * Get the values of non-hidden properties as a {@link Map} of keys and values.
-     */
-    public default Map<String, Object> values() {
-        final Map<String, Object> values = new HashMap<>();
-        this.properties().forEach((k, p) -> values.put(k, p.value()));
-        return values;
-    }
-
-    /**
-     * Get the values of hidden properties as a {@link Map} of keys and values.
-     */
-    public default Map<String, Object> hiddenValues() {
-        final Map<String, Object> values = new HashMap<>();
-        this.hiddens().forEach((k, p) -> values.put(k, p.value()));
-        return values;
-    }
-
-    /**
-     * Get a {@link Map} of non-hidden properties.
-     */
-    public Map<String, Property> properties();
-
-    /**
-     * Get a {@link Map} of hidden properties.
-     */
-    public Map<String, Property> hiddens();
 
     /**
      * Get a {@link Property} for the {@code Element} given its key.  Hidden properties can be retrieved by specifying
      * the key as {@link com.tinkerpop.gremlin.structure.Graph.Key#hide}.
      */
-    public <V> Property<V> property(final String key);
+    public default <V> Property<V> property(final String key) {
+        final Iterator<? extends Property<V>> iterator = Graph.Key.isHidden(key) ?
+                this.iterators().hiddenPropertyIterator(Graph.Key.unHide(key)) :
+                this.iterators().propertyIterator(key);
+        return iterator.hasNext() ? iterator.next() : Property.<V>empty();
+    }
 
     /**
      * Add or set a property value for the {@code Element} given its key.  Hidden properties can be set by specifying
      * the key as {@link com.tinkerpop.gremlin.structure.Graph.Key#hide}.
      */
     public <V> Property<V> property(final String key, final V value);
-
-    /**
-     * Set a series of properties on the {@code Element} by specifying a series of key/value pairs.  These key/values
-     * must be provided in an even number where the odd numbered arguments are {@link String} key values and the
-     * even numbered arguments are the related property values.  Hidden properties can be set by specifying
-     * the key as {@link com.tinkerpop.gremlin.structure.Graph.Key#hide}.
-     */
-    public default void properties(final Object... keyValues) {
-        ElementHelper.legalPropertyKeyValueArray(keyValues);
-        ElementHelper.attachProperties(this, keyValues);
-    }
 
     /**
      * Get the value of a {@link Property} given it's key.
@@ -124,6 +94,40 @@ public abstract interface Element {
     }
 
     /**
+     * Removes the {@code Element} from the graph.
+     */
+    public void remove();
+
+    public Element.Iterators iterators();
+
+    public interface Iterators {
+
+        /**
+         * Get the values of non-hidden properties as a {@link Map} of keys and values.
+         */
+        public default <V> Iterator<V> valueIterator(final String... propertyKeys) {
+            return StreamFactory.stream(this.propertyIterator(propertyKeys)).map(property -> (V) property.value()).iterator();
+        }
+
+        /**
+         * Get the values of hidden properties as a {@link Map} of keys and values.
+         */
+        public default <V> Iterator<V> hiddenValueIterator(final String... propertyKeys) {
+            return StreamFactory.stream(this.hiddenPropertyIterator(propertyKeys)).map(property -> (V) property.value()).iterator();
+        }
+
+        /**
+         * Get an {@link Iterator} of non-hidden properties.
+         */
+        public <V> Iterator<? extends Property<V>> propertyIterator(final String... propertyKeys);
+
+        /**
+         * Get an {@link Iterator} of hidden properties.
+         */
+        public <V> Iterator<? extends Property<V>> hiddenPropertyIterator(final String... propertyKeys);
+    }
+
+    /**
      * Common exceptions to use with an element.
      */
     public static class Exceptions {
@@ -133,16 +137,27 @@ public abstract interface Element {
         }
 
         public static IllegalArgumentException providedKeyValuesMustHaveALegalKeyOnEvenIndices() {
-            return new IllegalArgumentException("The provided key/value array must have a String key on even array indices");
+            return new IllegalArgumentException("The provided key/value array must have a String or T on even array indices");
         }
 
         public static IllegalStateException propertyAdditionNotSupported() {
-            return new IllegalStateException("Property additions are not supported");
+            return new IllegalStateException("Property addition is not supported");
         }
 
         public static IllegalStateException propertyRemovalNotSupported() {
-            return new IllegalStateException("Property removal are not supported");
+            return new IllegalStateException("Property removal is not supported");
+        }
+
+        public static IllegalArgumentException labelCanNotBeNull() {
+            return new IllegalArgumentException("Label can not be null");
+        }
+
+        public static IllegalArgumentException labelCanNotBeEmpty() {
+            return new IllegalArgumentException("Label can not be empty");
+        }
+
+        public static IllegalArgumentException labelCanNotBeASystemKey(final String label) {
+            return new IllegalArgumentException("Label can not be a system key: " + label);
         }
     }
-
 }

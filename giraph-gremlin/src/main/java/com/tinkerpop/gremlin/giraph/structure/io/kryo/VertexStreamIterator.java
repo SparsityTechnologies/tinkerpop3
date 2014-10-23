@@ -2,23 +2,23 @@ package com.tinkerpop.gremlin.giraph.structure.io.kryo;
 
 import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
-import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Vertex;
 import com.tinkerpop.gremlin.structure.io.kryo.KryoReader;
+import com.tinkerpop.gremlin.structure.util.detached.DetachedEdge;
+import com.tinkerpop.gremlin.structure.util.detached.DetachedVertex;
 import com.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph;
-import com.tinkerpop.gremlin.util.function.SQuintFunction;
-import com.tinkerpop.gremlin.util.function.STriFunction;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
-import java.util.NoSuchElementException;
+import java.util.function.Function;
 
 /**
  * @author Joshua Shinavier (http://fortytwo.net)
+ * @author Stephen Mallette (http://stephen.genoprime.com)
  */
 public class VertexStreamIterator implements Iterator<Vertex> {
 
@@ -119,11 +119,9 @@ public class VertexStreamIterator implements Iterator<Vertex> {
             }
 
             if (terminated) {
-                Graph gLocal = TinkerGraph.open();
-
-                STriFunction<Object, String, Object[], Vertex> vertexMaker = (id, label, props) -> createVertex(gLocal, id, label, props);
-                SQuintFunction<Object, Object, Object, String, Object[], Edge> edgeMaker = (id, outId, inId, label, props) -> createEdge(gLocal, id, outId, inId, label, props);
-
+                final Graph gLocal = TinkerGraph.open();
+                final Function<DetachedVertex, Vertex> vertexMaker = detachedVertex -> DetachedVertex.addTo(gLocal, detachedVertex);
+                final Function<DetachedEdge, Edge> edgeMaker = detachedEdge -> DetachedEdge.addTo(gLocal, detachedEdge);
                 try (InputStream in = new ByteArrayInputStream(output.toByteArray())) {
                     return reader.readVertex(in, Direction.BOTH, vertexMaker, edgeMaker);
                 }
@@ -131,54 +129,5 @@ public class VertexStreamIterator implements Iterator<Vertex> {
         }
 
         return null;
-    }
-
-    private Vertex createVertex(final Graph g,
-                                final Object id,
-                                final String label,
-                                final Object[] props) {
-
-        Object[] newProps = new Object[props.length + 4];
-        System.arraycopy(props, 0, newProps, 0, props.length);
-        newProps[props.length] = Element.ID;
-        newProps[props.length + 1] = id;
-        newProps[props.length + 2] = Element.LABEL;
-        newProps[props.length + 3] = label;
-
-        return g.addVertex(newProps);
-    }
-
-    private Edge createEdge(final Graph g,
-                            final Object id,
-                            final Object outId,
-                            final Object inId,
-                            final String label,
-                            final Object[] props) {
-        Vertex outV;
-        try {
-            outV = g.v(outId);
-        } catch (final NoSuchElementException e) {
-            outV = null;
-        }
-        if (null == outV) {
-            outV = g.addVertex(Element.ID, outId);
-        }
-
-        Vertex inV;
-        try {
-            inV = g.v(inId);
-        } catch (final NoSuchElementException e) {
-            inV = null;
-        }
-        if (null == inV) {
-            inV = g.addVertex(Element.ID, inId);
-        }
-
-        Object[] newProps = new Object[props.length + 2];
-        System.arraycopy(props, 0, newProps, 0, props.length);
-        newProps[props.length] = Element.ID;
-        newProps[props.length + 1] = id;
-
-        return outV.addEdge(label, inV, newProps);
     }
 }

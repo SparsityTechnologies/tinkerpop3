@@ -2,6 +2,8 @@ package com.tinkerpop.gremlin.process;
 
 import com.tinkerpop.gremlin.LoadGraphWith;
 import com.tinkerpop.gremlin.process.graph.GraphTraversal;
+import com.tinkerpop.gremlin.process.marker.CapTraversal;
+import com.tinkerpop.gremlin.process.marker.CountTraversal;
 import org.javatuples.Pair;
 import org.junit.Test;
 
@@ -47,10 +49,13 @@ public class TraversalCoverageTest extends AbstractGremlinProcessTest {
                         allReturnTypes.add(m.getReturnType().getCanonicalName());
                     });
             if (returnTypes.size() > 1) {
-                System.out.println("FAILURE: " + vendorClass.getCanonicalName() + " methods do not return in full fluency for [" + situation + "]");
+                final boolean muted = Boolean.parseBoolean(System.getProperty("muteTestLogs", "false"));
+                if (!muted) System.out.println("FAILURE: " + vendorClass.getCanonicalName() + " methods do not return in full fluency for [" + situation + "]");
                 fail("The return types of all traversal methods should be the same to ensure proper fluency: " + returnTypes);
-            } else
-                System.out.println("SUCCESS: " + vendorClass.getCanonicalName() + " methods return in full fluency for [" + situation + "]");
+            } else {
+                final boolean muted = Boolean.parseBoolean(System.getProperty("muteTestLogs", "false"));
+                if (!muted) System.out.println("SUCCESS: " + vendorClass.getCanonicalName() + " methods return in full fluency for [" + situation + "]");
+            }
         });
         if (allReturnTypes.size() > 1)
             fail("All traversals possible do not maintain the same return types and thus, not fully fluent for entire graph system: " + allReturnTypes);
@@ -61,11 +66,15 @@ public class TraversalCoverageTest extends AbstractGremlinProcessTest {
                 .stream()
                 .filter(m -> !GraphTraversal.class.equals(m.getReturnType()))
                 .filter(m -> !Traversal.class.equals(m.getReturnType()))
+                .filter(m -> !CountTraversal.class.equals(m.getReturnType()))
+                .filter(m -> !CapTraversal.class.equals(m.getReturnType()))
+                //.filter(m -> !Traversal.class.isAssignableFrom(m.getReturnType()))
                 .filter(m -> !Modifier.isStatic(m.getModifiers()))
                 .filter(m -> m.getName().equals(method.getName()))
                 .filter(m -> Arrays.asList(m.getParameterTypes()).toString().equals(Arrays.asList(method.getParameterTypes()).toString()))
-                .findFirst().orElseGet(() -> {
-                    System.out.println("IGNORE IF TEST PASSES: Can not find native implementation of: " + method);
+                .findAny().orElseGet(() -> {
+                    final boolean muted = Boolean.parseBoolean(System.getProperty("muteTestLogs", "false"));
+                    if (!muted) System.out.println("IGNORE IF TEST PASSES: Can not find native implementation of: " + method);
                     return method;
                 });
     }

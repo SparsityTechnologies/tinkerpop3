@@ -3,13 +3,16 @@ package com.tinkerpop.gremlin.structure;
 import com.tinkerpop.gremlin.AbstractGremlinSuite;
 import com.tinkerpop.gremlin.algorithm.generator.CommunityGeneratorTest;
 import com.tinkerpop.gremlin.algorithm.generator.DistributionGeneratorTest;
-import com.tinkerpop.gremlin.process.computer.GraphComputerTest;
 import com.tinkerpop.gremlin.structure.strategy.IdGraphStrategyTest;
 import com.tinkerpop.gremlin.structure.strategy.PartitionGraphStrategyTest;
 import com.tinkerpop.gremlin.structure.strategy.ReadOnlyGraphStrategyTest;
 import com.tinkerpop.gremlin.structure.strategy.SequenceGraphStrategyTest;
 import com.tinkerpop.gremlin.structure.strategy.StrategyWrappedGraphTest;
 import com.tinkerpop.gremlin.structure.strategy.SubgraphStrategyTest;
+import com.tinkerpop.gremlin.structure.util.detached.DetachedEdgeTest;
+import com.tinkerpop.gremlin.structure.util.detached.DetachedVertexPropertyTest;
+import com.tinkerpop.gremlin.structure.util.detached.DetachedPropertyTest;
+import com.tinkerpop.gremlin.structure.util.detached.DetachedVertexTest;
 import org.junit.runners.model.InitializationError;
 import org.junit.runners.model.RunnerBuilder;
 
@@ -23,15 +26,16 @@ import java.util.stream.Stream;
  * implementation.  This specialized test suite and runner is for use by Gremlin implementers to test their
  * Graph implementations.  The ProcessStandardSuite ensures consistency and validity of the implementations that they
  * test.
- * <p>
+ * <p/>
  * To use the StructureStandardSuite define a class in a test module.  Simple naming would expect the name of the
  * implementation followed by "StructureStandardSuite".  This class should be annotated as follows (note that the "Suite"
  * implements StructureStandardSuite.GraphProvider as a convenience only...it could be implemented in a separate class
  * file):
  * <code>
+ *
+ * @author Stephen Mallette (http://stephen.genoprime.com)
  * @RunWith(StructureStandardSuite.class)
- * @StructureStandardSuite.GraphProviderClass(TinkerGraphStructureStandardTest.class)
- * public class TinkerGraphStructureStandardTest implements GraphProvider {
+ * @StructureStandardSuite.GraphProviderClass(TinkerGraphStructureStandardTest.class) public class TinkerGraphStructureStandardTest implements GraphProvider {
  * }
  * </code>
  * Implementing {@link com.tinkerpop.gremlin.GraphProvider} provides a way for the StructureStandardSuite to
@@ -40,14 +44,16 @@ import java.util.stream.Stream;
  * <br/>
  * Set the {@code gremlin.structure.tests} environment variable to a comma separated list of test classes to execute.
  * This setting can be helpful to restrict execution of tests to specific ones being focused on during development.
- *
- * @author Stephen Mallette (http://stephen.genoprime.com)
  */
 public class StructureStandardSuite extends AbstractGremlinSuite {
 
     private static final Class<?>[] allTests = new Class<?>[]{
             BatchTest.class,
             CommunityGeneratorTest.class,
+            DetachedEdgeTest.class,
+            DetachedVertexPropertyTest.class,
+            DetachedPropertyTest.class,
+            DetachedVertexTest.class,
             DistributionGeneratorTest.class,
             EdgeTest.class,
             FeatureSupportTest.class,
@@ -55,6 +61,7 @@ public class StructureStandardSuite extends AbstractGremlinSuite {
             GraphConstructionTest.class,
             IdGraphStrategyTest.class,
             IoTest.class,
+            VertexPropertyTest.class,
             VariablesTest.class,
             PartitionGraphStrategyTest.class,
             PropertyTest.class,

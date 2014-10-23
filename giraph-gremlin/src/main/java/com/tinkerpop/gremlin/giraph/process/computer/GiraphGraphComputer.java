@@ -13,7 +13,6 @@ import com.tinkerpop.gremlin.process.computer.GraphComputer;
 import com.tinkerpop.gremlin.process.computer.MapReduce;
 import com.tinkerpop.gremlin.process.computer.VertexProgram;
 import com.tinkerpop.gremlin.process.computer.util.GraphComputerHelper;
-import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.util.StringFactory;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
@@ -35,11 +34,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
@@ -47,7 +43,7 @@ import java.util.concurrent.Future;
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class GiraphGraphComputer extends Configured implements GraphComputer, Tool {
+public final class GiraphGraphComputer extends Configured implements GraphComputer, Tool {
 
     public static final Logger LOGGER = LoggerFactory.getLogger(GiraphGraphComputer.class);
 
@@ -55,7 +51,7 @@ public class GiraphGraphComputer extends Configured implements GraphComputer, To
     protected GiraphConfiguration giraphConfiguration = new GiraphConfiguration();
     private boolean executed = false;
 
-    private final List<MapReduce> mapReduces = new ArrayList<>();
+    private final Set<MapReduce> mapReduces = new HashSet<>();
     private VertexProgram vertexProgram;
     final GiraphImmutableMemory memory = new GiraphImmutableMemory();
 
@@ -80,7 +76,7 @@ public class GiraphGraphComputer extends Configured implements GraphComputer, To
     @Override
     public GraphComputer program(final VertexProgram vertexProgram) {
         this.vertexProgram = vertexProgram;
-        final Configuration apacheConfiguration = new BaseConfiguration();
+        final BaseConfiguration apacheConfiguration = new BaseConfiguration();
         vertexProgram.storeState(apacheConfiguration);
         ConfUtil.mergeApacheIntoHadoopConfiguration(apacheConfiguration, this.giraphConfiguration);
         return this;
@@ -92,12 +88,8 @@ public class GiraphGraphComputer extends Configured implements GraphComputer, To
         return this;
     }
 
-    public static void mergeComputedView(final Graph original, final Graph computed, Map<String, String> keyMapping) {
-        throw new UnsupportedOperationException("GiraphGraphComputer does not support merge computed view as this does not make sense in a Hadoop environment where the graph is fully copied");
-    }
-
     public String toString() {
-        return StringFactory.computerString(this);
+        return StringFactory.graphComputerString(this);
     }
 
     @Override
@@ -141,15 +133,17 @@ public class GiraphGraphComputer extends Configured implements GraphComputer, To
                 if (!FileSystem.get(this.giraphConfiguration).exists(inputPath))
                     throw new IllegalArgumentException("The provided input path does not exist: " + inputPath);
                 FileInputFormat.setInputPaths(job.getInternalJob(), inputPath);
-                FileOutputFormat.setOutputPath(job.getInternalJob(), new Path(this.giraphConfiguration.get(Constants.GREMLIN_OUTPUT_LOCATION) + "/" + Constants.HIDDEN_G));
+                FileOutputFormat.setOutputPath(job.getInternalJob(), new Path(this.giraphConfiguration.get(Constants.GREMLIN_OUTPUT_LOCATION) + "/" + Constants.SYSTEM_G));
                 // job.getInternalJob().setJarByClass(GiraphGraphComputer.class);
                 LOGGER.info(Constants.GIRAPH_GREMLIN_JOB_PREFIX + this.vertexProgram);
-                job.run(true);
+                if (!job.run(true)) {
+                    throw new IllegalStateException("The Giraph-Gremlin job failed -- aborting all subsequent MapReduce jobs");
+                }
                 this.mapReduces.addAll(this.vertexProgram.getMapReducers());
                 // calculate main vertex program memory if desired (costs one mapreduce job)
                 if (this.giraphConfiguration.getBoolean(Constants.GREMLIN_DERIVE_MEMORY, false)) {
                     final Set<String> memoryKeys = new HashSet<String>(this.vertexProgram.getMemoryComputeKeys());
-                    memoryKeys.add(Constants.ITERATION);
+                    memoryKeys.add(Constants.SYSTEM_ITERATION);
                     this.giraphConfiguration.setStrings(Constants.GREMLIN_MEMORY_KEYS, (String[]) memoryKeys.toArray(new String[memoryKeys.size()]));
                     this.mapReduces.add(new MemoryMapReduce(memoryKeys));
                 }
@@ -158,8 +152,8 @@ public class GiraphGraphComputer extends Configured implements GraphComputer, To
             for (final MapReduce mapReduce : this.mapReduces) {
                 MapReduceHelper.executeMapReduceJob(mapReduce, this.memory, this.giraphConfiguration);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (final Exception e) {
+            // e.printStackTrace();
             throw new IllegalStateException(e.getMessage(), e);
         }
         return 0;
@@ -170,7 +164,7 @@ public class GiraphGraphComputer extends Configured implements GraphComputer, To
         if (this.giraphConfiguration.getBoolean(Constants.GREMLIN_JARS_IN_DISTRIBUTED_CACHE, true)) {
             final String giraphGremlinLibsLocal = System.getenv(Constants.GIRAPH_GREMLIN_LIBS);
             if (null == giraphGremlinLibsLocal)
-                LOGGER.warn(Constants.GIRAPH_GREMLIN_LIBS + " is not set -- proceeding regardless.");
+                LOGGER.warn(Constants.GIRAPH_GREMLIN_LIBS + " is not set -- proceeding regardless");
             else {
                 final File file = new File(giraphGremlinLibsLocal);
                 if (file.exists()) {
@@ -188,7 +182,7 @@ public class GiraphGraphComputer extends Configured implements GraphComputer, To
                         }
                     });
                 } else {
-                    LOGGER.warn(Constants.GIRAPH_GREMLIN_LIBS + " does not point to a valid director -- proceeding regardless.");
+                    LOGGER.warn(Constants.GIRAPH_GREMLIN_LIBS + " does not reference a valid directory -- proceeding regardless: " + giraphGremlinLibsLocal);
                 }
             }
         }

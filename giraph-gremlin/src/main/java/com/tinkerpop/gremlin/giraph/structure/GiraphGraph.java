@@ -3,7 +3,6 @@ package com.tinkerpop.gremlin.giraph.structure;
 import com.tinkerpop.gremlin.giraph.Constants;
 import com.tinkerpop.gremlin.giraph.process.computer.GiraphGraphComputer;
 import com.tinkerpop.gremlin.giraph.process.computer.util.ConfUtil;
-import com.tinkerpop.gremlin.giraph.process.computer.util.GiraphComputerHelper;
 import com.tinkerpop.gremlin.giraph.process.graph.step.sideEffect.GiraphGraphStep;
 import com.tinkerpop.gremlin.process.computer.GraphComputer;
 import com.tinkerpop.gremlin.process.computer.util.GraphComputerHelper;
@@ -11,7 +10,6 @@ import com.tinkerpop.gremlin.process.graph.GraphTraversal;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.StartStep;
 import com.tinkerpop.gremlin.process.graph.util.DefaultGraphTraversal;
 import com.tinkerpop.gremlin.structure.Edge;
-import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Transaction;
 import com.tinkerpop.gremlin.structure.Vertex;
@@ -21,7 +19,6 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.giraph.io.VertexInputFormat;
 import org.apache.giraph.io.VertexOutputFormat;
 
-import java.io.Serializable;
 import java.util.Optional;
 
 /**
@@ -29,27 +26,57 @@ import java.util.Optional;
  */
 @Graph.OptIn(Graph.OptIn.SUITE_PROCESS_STANDARD)
 @Graph.OptIn(Graph.OptIn.SUITE_PROCESS_COMPUTER)
+@Graph.OptIn(Graph.OptIn.SUITE_GROOVY_PROCESS_STANDARD)
+@Graph.OptIn(Graph.OptIn.SUITE_GROOVY_PROCESS_COMPUTER)
 @Graph.OptOut(
-        test = "com.tinkerpop.gremlin.process.graph.step.map.MatchTest$JavaMatchTest",
+        test = "com.tinkerpop.gremlin.process.graph.step.map.MatchTest$StandardTest",
         method = "g_V_matchXa_hasXname_GarciaX__a_0writtenBy_b__a_0sungBy_bX",
         reason = "Giraph-Gremlin is OLAP-oriented and for OLTP operations, linear-scan joins are required. This particular tests takes many minutes to execute.")
 @Graph.OptOut(
-        test = "com.tinkerpop.gremlin.process.graph.step.map.MatchTest$JavaMatchTest",
+        test = "com.tinkerpop.gremlin.process.graph.step.map.MatchTest$StandardTest",
         method = "g_V_matchXa_0sungBy_b__a_0sungBy_c__b_writtenBy_d__c_writtenBy_e__d_hasXname_George_HarisonX__e_hasXname_Bob_MarleyXX",
         reason = "Giraph-Gremlin is OLAP-oriented and for OLTP operations, linear-scan joins are required. This particular tests takes many minutes to execute.")
 @Graph.OptOut(
-        test = "com.tinkerpop.gremlin.process.graph.step.map.MatchTest$JavaMatchTest",
+        test = "com.tinkerpop.gremlin.process.graph.step.map.MatchTest$StandardTest",
         method = "g_V_matchXa_0sungBy_b__a_0writtenBy_c__b_writtenBy_d__c_sungBy_d__d_hasXname_GarciaXX",
         reason = "Giraph-Gremlin is OLAP-oriented and for OLTP operations, linear-scan joins are required. This particular tests takes many minutes to execute.")
 @Graph.OptOut(
-        test = "com.tinkerpop.gremlin.process.computer.GraphComputerTest",
-        method = "shouldNotAllowBadMemoryKeys",
+        test = "com.tinkerpop.gremlin.process.graph.step.map.GroovyMatchTest$StandardTest",
+        method = "g_V_matchXa_hasXname_GarciaX__a_0writtenBy_b__a_0sungBy_bX",
+        reason = "Giraph-Gremlin is OLAP-oriented and for OLTP operations, linear-scan joins are required. This particular tests takes many minutes to execute.")
+@Graph.OptOut(
+        test = "com.tinkerpop.gremlin.process.graph.step.map.GroovyMatchTest$StandardTest",
+        method = "g_V_matchXa_0sungBy_b__a_0sungBy_c__b_writtenBy_d__c_writtenBy_e__d_hasXname_George_HarisonX__e_hasXname_Bob_MarleyXX",
+        reason = "Giraph-Gremlin is OLAP-oriented and for OLTP operations, linear-scan joins are required. This particular tests takes many minutes to execute.")
+@Graph.OptOut(
+        test = "com.tinkerpop.gremlin.process.graph.step.map.GroovyMatchTest$StandardTest",
+        method = "g_V_matchXa_0sungBy_b__a_0writtenBy_c__b_writtenBy_d__c_sungBy_d__d_hasXname_GarciaXX",
+        reason = "Giraph-Gremlin is OLAP-oriented and for OLTP operations, linear-scan joins are required. This particular tests takes many minutes to execute.")
+@Graph.OptOut(
+        test = "com.tinkerpop.gremlin.process.graph.step.sideEffect.CountTest$StandardTest",
+        method = "g_V_both_both_count",
+        reason = "Giraph-Gremlin is OLAP-oriented and for OLTP operations, linear-scan joins are required. This particular tests takes many minutes to execute.")
+@Graph.OptOut(
+        test = "com.tinkerpop.gremlin.process.graph.step.sideEffect.CountTest$StandardTest",
+        method = "g_V_asXaX_out_jumpXa_loops_lt_3X_count",
+        reason = "Giraph-Gremlin is OLAP-oriented and for OLTP operations, linear-scan joins are required. This particular tests takes many minutes to execute.")
+@Graph.OptOut(
+        test = "com.tinkerpop.gremlin.process.graph.step.sideEffect.GroovyCountTest$StandardTest",
+        method = "g_V_both_both_count",
+        reason = "Giraph-Gremlin is OLAP-oriented and for OLTP operations, linear-scan joins are required. This particular tests takes many minutes to execute.")
+@Graph.OptOut(
+        test = "com.tinkerpop.gremlin.process.graph.step.sideEffect.GroovyCountTest$StandardTest",
+        method = "g_V_asXaX_out_jumpXa_loops_lt_3X_count",
+        reason = "Giraph-Gremlin is OLAP-oriented and for OLTP operations, linear-scan joins are required. This particular tests takes many minutes to execute.")
+@Graph.OptOut(
+        test = "com.tinkerpop.gremlin.process.computer.GroovyGraphComputerTest$ComputerTest",
+        method = "shouldNotAllowNullMemoryKeys",
         reason = "Giraph does a hard kill on failure and stops threads which stops test cases. Exception handling semantics are correct though.")
 @Graph.OptOut(
-        test = "com.tinkerpop.gremlin.process.computer.GraphComputerTest",
-        method = "shouldRequireRegisteringMemoryKeys",
+        test = "com.tinkerpop.gremlin.process.computer.GroovyGraphComputerTest$ComputerTest",
+        method = "shouldNotAllowSettingUndeclaredMemoryKeys",
         reason = "Giraph does a hard kill on failure and stops threads which stops test cases. Exception handling semantics are correct though.")
-public class GiraphGraph implements Graph, Serializable {
+public class GiraphGraph implements Graph {
 
     protected final GiraphGraphVariables variables;
 
@@ -61,55 +88,26 @@ public class GiraphGraph implements Graph, Serializable {
         return GiraphGraph.open(null);
     }
 
-    public static <G extends Graph> G open(final Configuration configuration) {
-        final GiraphGraph graph = new GiraphGraph(Optional.ofNullable(configuration).orElse(new BaseConfiguration()));
-        return (G) graph;
+    public static GiraphGraph open(final Configuration configuration) {
+        return new GiraphGraph(Optional.ofNullable(configuration).orElse(new BaseConfiguration()));
     }
 
     @Override
     public GraphTraversal<Vertex, Vertex> V() {
-        final GraphTraversal<Vertex, Vertex> traversal = new DefaultGraphTraversal<Vertex, Vertex>() {
-            @Override
-            public GraphTraversal<Vertex, Vertex> submit(final GraphComputer computer) {
-                GiraphComputerHelper.prepareTraversalForComputer(this);
-                return super.submit(computer);
-            }
-        };
-        traversal.addStep(new GiraphGraphStep(traversal, Vertex.class, this));
-        traversal.sideEffects().setGraph(this);
-        return traversal;
+        final GraphTraversal<Vertex, Vertex> traversal = new DefaultGraphTraversal<>(this);
+        return traversal.addStep(new GiraphGraphStep<>(traversal, Vertex.class, this));
     }
 
     @Override
     public GraphTraversal<Edge, Edge> E() {
-        final GraphTraversal<Edge, Edge> traversal = new DefaultGraphTraversal<Edge, Edge>() {
-            @Override
-            public GraphTraversal<Edge, Edge> submit(final GraphComputer computer) {
-                GiraphComputerHelper.prepareTraversalForComputer(this);
-                return super.submit(computer);
-            }
-        };
-        traversal.addStep(new GiraphGraphStep(traversal, Edge.class, this));
-        traversal.sideEffects().setGraph(this);
-        return traversal;
+        final GraphTraversal<Edge, Edge> traversal = new DefaultGraphTraversal<>(this);
+        return traversal.addStep(new GiraphGraphStep<>(traversal, Edge.class, this));
     }
 
     @Override
     public <S> GraphTraversal<S, S> of() {
-        final GraphTraversal<S, S> traversal = new DefaultGraphTraversal<>();
-        traversal.sideEffects().setGraph(this);
-        traversal.addStep(new StartStep<>(traversal));
-        return traversal;
-    }
-
-    @Override
-    public Vertex v(final Object id) {
-        return this.V().<Vertex>has(Element.ID, id).next();
-    }
-
-    @Override
-    public Edge e(final Object id) {
-        return this.E().<Edge>has(Element.ID, id).next();
+        final GraphTraversal<S, S> traversal = new DefaultGraphTraversal<>(this);
+        return traversal.addStep(new StartStep<>(traversal));
     }
 
     @Override
@@ -136,10 +134,10 @@ public class GiraphGraph implements Graph, Serializable {
         final org.apache.hadoop.conf.Configuration hadoopConfiguration = ConfUtil.makeHadoopConfiguration(this.variables().getConfiguration());
         final String fromString = this.variables().getConfiguration().containsKey(Constants.GIRAPH_VERTEX_INPUT_FORMAT_CLASS) ?
                 hadoopConfiguration.getClass(Constants.GIRAPH_VERTEX_INPUT_FORMAT_CLASS, VertexInputFormat.class).getSimpleName() :
-                "none";
+                "no-input";
         final String toString = this.variables().getConfiguration().containsKey(Constants.GIRAPH_VERTEX_OUTPUT_FORMAT_CLASS) ?
                 hadoopConfiguration.getClass(Constants.GIRAPH_VERTEX_OUTPUT_FORMAT_CLASS, VertexOutputFormat.class).getSimpleName() :
-                "none";
+                "no-output";
         return StringFactory.graphString(this, fromString.toLowerCase() + "->" + toString.toLowerCase());
     }
 
@@ -180,8 +178,23 @@ public class GiraphGraph implements Graph, Serializable {
                     }
 
                     @Override
+                    public boolean supportsAddProperty() {
+                        return false;
+                    }
+
+                    @Override
                     public boolean supportsCustomIds() {
                         return false;
+                    }
+
+                    @Override
+                    public VertexPropertyFeatures properties() {
+                        return new VertexPropertyFeatures() {
+                            @Override
+                            public boolean supportsAddProperty() {
+                                return false;
+                            }
+                        };
                     }
                 };
             }
@@ -191,6 +204,11 @@ public class GiraphGraph implements Graph, Serializable {
                 return new EdgeFeatures() {
                     @Override
                     public boolean supportsAddEdges() {
+                        return false;
+                    }
+
+                    @Override
+                    public boolean supportsAddProperty() {
                         return false;
                     }
 

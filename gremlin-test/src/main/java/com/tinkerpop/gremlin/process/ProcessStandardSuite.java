@@ -1,11 +1,14 @@
 package com.tinkerpop.gremlin.process;
 
 import com.tinkerpop.gremlin.AbstractGremlinSuite;
+import com.tinkerpop.gremlin.process.graph.step.branch.ChooseTest;
+import com.tinkerpop.gremlin.process.graph.step.branch.JumpTest;
+import com.tinkerpop.gremlin.process.graph.step.branch.UnionTest;
+import com.tinkerpop.gremlin.process.graph.step.branch.UntilTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.CyclicPathTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.DedupTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.ExceptTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.FilterTest;
-import com.tinkerpop.gremlin.process.graph.step.filter.WhereTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.HasNotTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.HasTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.IntervalTest;
@@ -13,17 +16,20 @@ import com.tinkerpop.gremlin.process.graph.step.filter.RandomTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.RangeTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.RetainTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.SimplePathTest;
+import com.tinkerpop.gremlin.process.graph.step.filter.WhereTest;
 import com.tinkerpop.gremlin.process.graph.step.map.BackTest;
-import com.tinkerpop.gremlin.process.graph.step.map.ChooseTest;
 import com.tinkerpop.gremlin.process.graph.step.map.FoldTest;
-import com.tinkerpop.gremlin.process.graph.step.map.JumpTest;
+import com.tinkerpop.gremlin.process.graph.step.map.HiddenValueMapTest;
 import com.tinkerpop.gremlin.process.graph.step.map.MapTest;
 import com.tinkerpop.gremlin.process.graph.step.map.MatchTest;
+import com.tinkerpop.gremlin.process.graph.step.map.OrderByTest;
 import com.tinkerpop.gremlin.process.graph.step.map.OrderTest;
 import com.tinkerpop.gremlin.process.graph.step.map.PathTest;
+import com.tinkerpop.gremlin.process.graph.step.map.PropertiesTest;
 import com.tinkerpop.gremlin.process.graph.step.map.SelectTest;
+import com.tinkerpop.gremlin.process.graph.step.map.ShuffleTest;
 import com.tinkerpop.gremlin.process.graph.step.map.UnfoldTest;
-import com.tinkerpop.gremlin.process.graph.step.map.ValuesTest;
+import com.tinkerpop.gremlin.process.graph.step.map.ValueMapTest;
 import com.tinkerpop.gremlin.process.graph.step.map.VertexTest;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.AddEdgeTest;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.AggregateTest;
@@ -31,12 +37,14 @@ import com.tinkerpop.gremlin.process.graph.step.sideEffect.CountTest;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.GroupByTest;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.GroupCountTest;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.InjectTest;
+import com.tinkerpop.gremlin.process.graph.step.sideEffect.ProfileTest;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.SideEffectCapTest;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.SideEffectTest;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.StoreTest;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.SubgraphTest;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.TreeTest;
-import com.tinkerpop.gremlin.process.graph.step.util.MemoryTest;
+import com.tinkerpop.gremlin.process.graph.step.util.TraversalSideEffectsTest;
+import com.tinkerpop.gremlin.process.graph.step.util.TraversalStrategiesTest;
 import org.junit.runners.model.InitializationError;
 import org.junit.runners.model.RunnerBuilder;
 
@@ -50,11 +58,11 @@ import java.util.stream.Stream;
  * implementation.  This specialized test suite and runner is for use by Gremlin implementers to test their
  * Graph implementations.  The StructureStandardSuite ensures consistency and validity of the implementations that they
  * test.
- * <p>
+ * <p/>
  * To use the ProcessStandardSuite define a class in a test module.  Simple naming would expect the name of the
  * implementation followed by "ProcessStandardSuite".  This class should be annotated as follows (note that the "Suite"
  * implements ProcessStandardSuite.GraphProvider as a convenience only...it could be implemented in a separate class file):
- * <p>
+ * <p/>
  * <code>
  *
  * @author Stephen Mallette (http://stephen.genoprime.com)
@@ -62,7 +70,7 @@ import java.util.stream.Stream;
  * @ProcessStandardSuite.GraphProviderClass(TinkerGraphProcessStandardTest.class) public class TinkerGraphProcessStandardTest implements GraphProvider {
  * }
  * </code>
- * <p>
+ * <p/>
  * Implementing {@link com.tinkerpop.gremlin.GraphProvider} provides a way for the ProcessStandardSuite to
  * instantiate Graph instances from the implementation being tested to inject into tests in the suite.  The
  * ProcessStandardSuite will utilized Features defined in the suite to determine which tests will be executed.
@@ -74,55 +82,64 @@ public class ProcessStandardSuite extends AbstractGremlinSuite {
      * as needed to enforce tests upon implementations.
      */
     private static final Class<?>[] allTests = new Class<?>[]{
+            // branch
+            ChooseTest.StandardTest.class,
+            JumpTest.StandardTest.class,
+            UnionTest.StandardTest.class,
+            UntilTest.StandardTest.class,
+
             // filter
-            CyclicPathTest.JavaCyclicPathTest.class,
-            DedupTest.JavaDedupTest.class,
-            ExceptTest.JavaExceptTest.class,
-            FilterTest.JavaFilterTest.class,
-            WhereTest.JavaWhereTest.class,
-            HasNotTest.JavaHasNotTest.class,
-            HasTest.JavaHasTest.class,
-            InjectTest.JavaInjectTest.class,
-            IntervalTest.JavaIntervalTest.class,
-            RandomTest.JavaRandomTest.class,
-            RangeTest.JavaRangeTest.class,
-            RetainTest.JavaRetainTest.class,
-            SimplePathTest.JavaSimplePathTest.class,
+            CyclicPathTest.StandardTest.class,
+            DedupTest.StandardTest.class,
+            ExceptTest.StandardTest.class,
+            FilterTest.StandardTest.class,
+            HasNotTest.StandardTest.class,
+            HasTest.StandardTest.class,
+            IntervalTest.StandardTest.class,
+            RandomTest.StandardTest.class,
+            RangeTest.StandardTest.class,
+            RetainTest.StandardTest.class,
+            SimplePathTest.StandardTest.class,
+            WhereTest.StandardTest.class,
 
             // map
-            BackTest.JavaBackTest.class,
-            ChooseTest.JavaChooseTest.class,
-            FoldTest.JavaFoldTest.class,
-            ChooseTest.JavaChooseTest.class,
-            JumpTest.JavaJumpTest.class,
-            MapTest.JavaMapTest.class,
-            MatchTest.JavaMatchTest.class,
-            OrderTest.JavaOrderTest.class,
-            PathTest.JavaPathTest.class,
-            SelectTest.JavaSelectTest.class,
-            VertexTest.JavaVertexTest.class,
-            UnfoldTest.JavaUnfoldTest.class,
-            // UnionTest.JavaUnionTest.class,
-            ValuesTest.JavaValuesTest.class,
+            BackTest.StandardTest.class,
+            FoldTest.StandardTest.class,
+            HiddenValueMapTest.StandardTest.class,
+            MapTest.StandardTest.class,
+            MatchTest.StandardTest.class,
+            OrderTest.StandardTest.class,
+            OrderByTest.StandardTest.class,
+            PathTest.StandardTest.class,
+            PropertiesTest.StandardTest.class,
+            SelectTest.StandardTest.class,
+            ShuffleTest.StandardTest.class,
+            VertexTest.StandardTest.class,
+            UnfoldTest.StandardTest.class,
+            ValueMapTest.StandardTest.class,
 
             // sideEffect
-            AddEdgeTest.JavaAddEdgeTest.class,
-            AggregateTest.JavaAggregateTest.class,
-            CountTest.JavaCountTest.class,
-            GroupByTest.JavaGroupByTest.class,
-            GroupCountTest.JavaGroupCountTest.class,
-            SideEffectCapTest.JavaSideEffectCapTest.class,
-            SideEffectTest.JavaSideEffectTest.class,
-            StoreTest.JavaStoreTest.class,
-            SubgraphTest.JavaSubgraphTest.class,
-            TreeTest.JavaTreeTest.class,
+            AddEdgeTest.StandardTest.class,
+            AggregateTest.StandardTest.class,
+            CountTest.StandardTest.class,
+            GroupByTest.StandardTest.class,
+            GroupCountTest.StandardTest.class,
+            InjectTest.StandardTest.class,
+            ProfileTest.StandardTest.class,
+            SideEffectCapTest.StandardTest.class,
+            SideEffectTest.StandardTest.class,
+            StoreTest.StandardTest.class,
+            SubgraphTest.StandardTest.class,
+            TreeTest.StandardTest.class,
 
             // util
-            MemoryTest.JavaSideEffectsTest.class,
+            TraversalSideEffectsTest.StandardTest.class,
+            TraversalStrategiesTest.StandardTest.class,
 
             // compliance
             TraversalCoverageTest.class,
             CoreTraversalTest.class,
+            PathStructureTest.class,
 
             // algorithms
             // PageRankVertexProgramTest.class
@@ -132,36 +149,40 @@ public class ProcessStandardSuite extends AbstractGremlinSuite {
      * Tests that will be enforced by the suite where instances of them should be in the list of testsToExecute.
      */
     protected static Class<?>[] testsToEnforce = new Class<?>[]{
+            // branch
+            ChooseTest.class,
+            JumpTest.class,
+            UnionTest.class,
+            UntilTest.class,
+
             // filter
             CyclicPathTest.class,
             DedupTest.class,
             ExceptTest.class,
             FilterTest.class,
-            WhereTest.class,
             HasNotTest.class,
             HasTest.class,
-            InjectTest.class,
             IntervalTest.class,
             RandomTest.class,
             RangeTest.class,
             RetainTest.class,
             SimplePathTest.class,
+            WhereTest.class,
 
             // map
             BackTest.class,
-            ChooseTest.class,
             FoldTest.class,
-            ChooseTest.class,
-            JumpTest.class,
+            HiddenValueMapTest.class,
             MapTest.class,
             MatchTest.class,
             OrderTest.class,
+            OrderByTest.class,
             PathTest.class,
             SelectTest.class,
+            ShuffleTest.class,
             VertexTest.class,
             UnfoldTest.class,
-            //UnionTest.class,
-            ValuesTest.class,
+            ValueMapTest.class,
 
             // sideEffect
             AddEdgeTest.class,
@@ -169,21 +190,24 @@ public class ProcessStandardSuite extends AbstractGremlinSuite {
             CountTest.class,
             GroupByTest.class,
             GroupCountTest.class,
+            InjectTest.class,
+            ProfileTest.class,
             SideEffectCapTest.class,
             SideEffectTest.class,
             StoreTest.class,
             SubgraphTest.class,
             TreeTest.class,
 
-            // algorithms
-            // PageRankVertexProgramTest.class,
-
             // util
-            MemoryTest.class,
+            TraversalSideEffectsTest.class,
 
             // compliance
             TraversalCoverageTest.class,
-            CoreTraversalTest.class
+            CoreTraversalTest.class,
+            PathStructureTest.class,
+
+            // algorithms
+            // PageRankVertexProgramTest.class
     };
 
     /**

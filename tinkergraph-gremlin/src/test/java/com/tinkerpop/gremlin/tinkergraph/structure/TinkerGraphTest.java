@@ -1,34 +1,29 @@
 package com.tinkerpop.gremlin.tinkergraph.structure;
 
 import com.tinkerpop.gremlin.AbstractGremlinTest;
+import com.tinkerpop.gremlin.process.T;
+import com.tinkerpop.gremlin.process.Traverser;
+import com.tinkerpop.gremlin.process.graph.GraphTraversal;
+import com.tinkerpop.gremlin.process.graph.step.sideEffect.ProfileStep;
+import com.tinkerpop.gremlin.process.util.TraversalMetrics;
 import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
-import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Graph;
-import com.tinkerpop.gremlin.structure.IoTest;
 import com.tinkerpop.gremlin.structure.Vertex;
 import com.tinkerpop.gremlin.structure.io.GraphReader;
-import com.tinkerpop.gremlin.structure.io.graphml.GraphMLReader;
 import com.tinkerpop.gremlin.structure.io.graphml.GraphMLWriter;
 import com.tinkerpop.gremlin.structure.io.graphson.GraphSONWriter;
 import com.tinkerpop.gremlin.structure.io.kryo.KryoReader;
 import com.tinkerpop.gremlin.structure.io.kryo.KryoWriter;
-import com.tinkerpop.gremlin.structure.util.ElementHelper;
 import com.tinkerpop.gremlin.util.StreamFactory;
+import org.apache.commons.io.FileUtils;
+import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.OutputStream;
-import java.io.Serializable;
+import java.io.*;
 import java.util.Set;
-import java.util.UUID;
+import java.util.function.Predicate;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -36,7 +31,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class TinkerGraphTest implements Serializable {
+public class TinkerGraphTest {
 
     private static String tempPath;
 
@@ -46,6 +41,15 @@ public class TinkerGraphTest implements Serializable {
             tempPath = temp + File.separator;
         else
             tempPath = temp;
+
+        tempPath = tempPath + "tinkerpop-io/";
+    }
+
+    @BeforeClass
+    public static void before() throws IOException {
+        final File tempDir = new File(tempPath);
+        FileUtils.deleteDirectory(tempDir);
+        if (!tempDir.mkdirs()) throw new IOException(String.format("Could not create %s", tempDir));
     }
 
     @Test
@@ -79,6 +83,16 @@ public class TinkerGraphTest implements Serializable {
      * No assertions.  Just write out the graph for convenience.
      */
     @Test
+    public void shouldWriteCrewGraphAsKryo() throws IOException {
+        final OutputStream os = new FileOutputStream(tempPath + "tinkerpop-crew.gio");
+        KryoWriter.build().create().writeGraph(os, TinkerFactory.createTheCrew());
+        os.close();
+    }
+
+    /**
+     * No assertions.  Just write out the graph for convenience.
+     */
+    @Test
     public void shouldWriteClassicVerticesAsKryo() throws IOException {
         final OutputStream os = new FileOutputStream(tempPath + "tinkerpop-classic-vertices.gio");
         KryoWriter.build().create().writeVertices(os, TinkerFactory.createClassic().V(), Direction.BOTH);
@@ -89,9 +103,30 @@ public class TinkerGraphTest implements Serializable {
      * No assertions.  Just write out the graph for convenience.
      */
     @Test
-    public void shouldWriteModernVerticesAsKryoAsKryo() throws IOException {
+    public void shouldWriteClassicVerticesAsGraphSON() throws IOException {
+        final OutputStream os = new FileOutputStream(tempPath + "tinkerpop-classic-vertices.ldjson");
+        GraphSONWriter.build().create().writeVertices(os, TinkerFactory.createClassic().V(), Direction.BOTH);
+        os.close();
+    }
+
+    /**
+     * No assertions.  Just write out the graph for convenience.
+     */
+    @Test
+    public void shouldWriteModernVerticesAsKryo() throws IOException {
         final OutputStream os = new FileOutputStream(tempPath + "tinkerpop-modern-vertices.gio");
         final TinkerGraph g = TinkerFactory.createModern();
+        KryoWriter.build().create().writeVertices(os, g.V(), Direction.BOTH);
+        os.close();
+    }
+
+    /**
+     * No assertions.  Just write out the graph for convenience.
+     */
+    @Test
+    public void shouldWriteCrewVerticesAsKryo() throws IOException {
+        final OutputStream os = new FileOutputStream(tempPath + "tinkerpop-crew-vertices.gio");
+        final TinkerGraph g = TinkerFactory.createTheCrew();
         KryoWriter.build().create().writeVertices(os, g.V(), Direction.BOTH);
         os.close();
     }
@@ -140,6 +175,16 @@ public class TinkerGraphTest implements Serializable {
      * No assertions.  Just write out the graph for convenience.
      */
     @Test
+    public void shouldWriteCrewGraphAsGraphSONNoTypes() throws IOException {
+        final OutputStream os = new FileOutputStream(tempPath + "tinkerpop-crew.json");
+        GraphSONWriter.build().create().writeGraph(os, TinkerFactory.createTheCrew());
+        os.close();
+    }
+
+    /**
+     * No assertions.  Just write out the graph for convenience.
+     */
+    @Test
     public void shouldWriteClassicGraphNormalizedAsGraphSON() throws IOException {
         final OutputStream os = new FileOutputStream(tempPath + "tinkerpop-classic-normalized.json");
         GraphSONWriter.build().normalize(true).create().writeGraph(os, TinkerFactory.createClassic());
@@ -174,7 +219,7 @@ public class TinkerGraphTest implements Serializable {
     public void shouldWriteModernGraphAsGraphSONWithTypes() throws IOException {
         final OutputStream os = new FileOutputStream(tempPath + "tinkerpop-modern-typed.json");
         GraphSONWriter.build().embedTypes(true)
-                .create().writeGraph(os, TinkerFactory.createClassic());
+                .create().writeGraph(os, TinkerFactory.createModern());
         os.close();
     }
 
@@ -182,60 +227,10 @@ public class TinkerGraphTest implements Serializable {
      * No assertions.  Just write out the graph for convenience.
      */
     @Test
-    public void shouldWriteGratefulGraphAsKryo() throws IOException {
-        final Graph g = TinkerGraph.open();
-        final GraphReader reader = GraphMLReader.build().create();
-        try (final InputStream stream = AbstractGremlinTest.class.getResourceAsStream("/com/tinkerpop/gremlin/structure/util/io/graphml/grateful-dead.xml")) {
-            reader.readGraph(stream, g);
-        }
-
-        final OutputStream os = new FileOutputStream(tempPath + "grateful-dead.gio");
-        KryoWriter.build().create().writeGraph(os, g);
-        os.close();
-    }
-
-    @Test
-    public void shouldWriteGratefulGraphAsGraphSON() throws IOException {
-        final Graph g = TinkerGraph.open();
-        final GraphReader reader = GraphMLReader.build().create();
-        try (final InputStream stream = AbstractGremlinTest.class.getResourceAsStream("/com/tinkerpop/gremlin/structure/util/io/graphml/grateful-dead.xml")) {
-            reader.readGraph(stream, g);
-        }
-
-        final OutputStream os = new FileOutputStream(tempPath + "grateful-dead.json");
-        GraphSONWriter.build().embedTypes(true).create().writeGraph(os, g);
-        os.close();
-    }
-
-    /**
-     * No assertions.  Just write out the graph for convenience.
-     */
-    @Test
-    public void shouldWriteGratefulVerticesAsKryo() throws IOException {
-        final Graph g = TinkerGraph.open();
-        final GraphReader reader = KryoReader.build().create();
-        try (final InputStream stream = AbstractGremlinTest.class.getResourceAsStream("/com/tinkerpop/gremlin/structure/util/io/kryo/grateful-dead.gio")) {
-            reader.readGraph(stream, g);
-        }
-
-        final OutputStream os = new FileOutputStream(tempPath + "grateful-dead-vertices.gio");
-        KryoWriter.build().create().writeVertices(os, g.V(), Direction.BOTH);
-        os.close();
-    }
-
-    /**
-     * No assertions.  Just write out the graph for convenience.
-     */
-    @Test
-    public void shouldWriteGratefulVerticesAsGraphSON() throws IOException {
-        final Graph g = TinkerGraph.open();
-        final GraphReader reader = KryoReader.build().create();
-        try (final InputStream stream = AbstractGremlinTest.class.getResourceAsStream("/com/tinkerpop/gremlin/structure/util/io/kryo/grateful-dead.gio")) {
-            reader.readGraph(stream, g);
-        }
-
-        final OutputStream os = new FileOutputStream(tempPath + "grateful-dead-vertices.ldjson");
-        GraphSONWriter.build().create().writeVertices(os, g.V(), Direction.BOTH);
+    public void shouldWriteCrewGraphAsGraphSONWithTypes() throws IOException {
+        final OutputStream os = new FileOutputStream(tempPath + "tinkerpop-crew-typed.json");
+        GraphSONWriter.build().embedTypes(true)
+                .create().writeGraph(os, TinkerFactory.createTheCrew());
         os.close();
     }
 
@@ -467,67 +462,40 @@ public class TinkerGraphTest implements Serializable {
         }, 0.5).has("oid", "1")).count());
     }
 
+    /**
+     * This test helps with data conversions on Grateful Dead.  No Assertions...run as needed. Never read from the
+     * GraphML source as it will always use a String identifier.
+     */
     @Test
-    public void shouldSerializeGraph() throws Exception {
-        final TinkerGraph g = TinkerFactory.createModern();
-        final String fileName = UUID.randomUUID().toString() + ".bin";
-        final String location = tempPath + "tp" + File.separator + "tinkergraph-serialization-test" + File.separator;
-        deleteFile(location);
-
-        final File f = new File(location);
-        if (!f.exists())
-            f.mkdirs();
-
-
-        final ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(location + fileName));
-        out.writeObject(g);
-        out.close();
-
-        final ObjectInputStream input = new ObjectInputStream(new FileInputStream(location + fileName));
-
-        try {
-            final TinkerGraph g1 = (TinkerGraph) input.readObject();
-            IoTest.assertToyGraph(g1, true, false, true);
-        } catch (ClassNotFoundException cnfe) {
-            throw new RuntimeException(cnfe);
-        } finally {
-            input.close();
-        }
-    }
-
-    // TODO: kill this test below once we're sure we're happy with grateful dead
-    @Test
-    @Ignore
-    public void shouldConvertGratefulDeadTypesToLabels() throws IOException {
+    public void shouldWriteGratefulDead() throws IOException {
         final Graph g = TinkerGraph.open();
         final GraphReader reader = KryoReader.build().create();
-        try (final InputStream stream = AbstractGremlinTest.class.getResourceAsStream("/com/tinkerpop/gremlin/structure/util/io/kryo/grateful-dead.gio")) {
+        try (final InputStream stream = AbstractGremlinTest.class.getResourceAsStream("/com/tinkerpop/gremlin/structure/io/kryo/grateful-dead.gio")) {
             reader.readGraph(stream, g);
         }
 
-        /*
         final Graph ng = TinkerGraph.open();
         g.V().sideEffect(ov -> {
-            Vertex v = ov.get();
-            if (v.value("type").equals("song"))
-                ng.addVertex(Element.ID, v.id(), Element.LABEL, "song", "name", v.value("name"), "performances", v.property("performances").orElse(0), "songType", v.property("songType").orElse(""));
-            else if (v.value("type").equals("artist"))
-                ng.addVertex(Element.ID, v.id(), Element.LABEL, "artist", "name", v.value("name"));
+            final Vertex v = ov.get();
+            if (v.label().equals("song"))
+                ng.addVertex(T.id, Integer.parseInt(v.id().toString()), T.label, "song", "name", v.value("name"), "performances", v.property("performances").orElse(0), "songType", v.property("songType").orElse(""));
+            else if (v.label().equals("artist"))
+                ng.addVertex(T.id, Integer.parseInt(v.id().toString()), T.label, "artist", "name", v.value("name"));
             else
                 throw new RuntimeException("damn");
         }).iterate();
 
         g.E().sideEffect(oe -> {
-            Edge e = oe.get();
-            Vertex v2 = ng.v(e.inV().next().id());
-            Vertex v1 = ng.v(e.outV().next().id());
+            final Edge e = oe.get();
+            final Vertex v2 = ng.v(Integer.parseInt(e.inV().next().id().toString()));
+            final Vertex v1 = ng.v(Integer.parseInt(e.outV().next().id().toString()));
 
             if (e.label().equals("followedBy"))
-                v1.addEdge("followedBy", v2, Element.ID, e.id(), "weight", e.value("weight"));
+                v1.addEdge("followedBy", v2, T.id, Integer.parseInt(e.id().toString()), "weight", e.value("weight"));
             else if (e.label().equals("sungBy"))
-                v1.addEdge("sungBy", v2, Element.ID, e.id());
+                v1.addEdge("sungBy", v2, T.id, Integer.parseInt(e.id().toString()));
             else if (e.label().equals("writtenBy"))
-                v1.addEdge("writtenBy", v2, Element.ID, e.id());
+                v1.addEdge("writtenBy", v2, T.id, Integer.parseInt(e.id().toString()));
             else
                 throw new RuntimeException("bah");
 
@@ -536,7 +504,6 @@ public class TinkerGraphTest implements Serializable {
         final OutputStream os = new FileOutputStream(tempPath + "grateful-dead.gio");
         KryoWriter.build().create().writeGraph(os, ng);
         os.close();
-        */
 
         final OutputStream os2 = new FileOutputStream(tempPath + "grateful-dead.json");
         GraphSONWriter.build().embedTypes(true).create().writeGraph(os2, g);
@@ -545,6 +512,14 @@ public class TinkerGraphTest implements Serializable {
         final OutputStream os3 = new FileOutputStream(tempPath + "grateful-dead.xml");
         GraphMLWriter.build().create().writeGraph(os3, g);
         os3.close();
+
+        final OutputStream os4 = new FileOutputStream(tempPath + "grateful-dead-vertices.gio");
+        KryoWriter.build().create().writeVertices(os4, g.V(), Direction.BOTH);
+        os.close();
+
+        final OutputStream os5 = new FileOutputStream(tempPath + "grateful-dead-vertices.ldjson");
+        GraphSONWriter.build().create().writeVertices(os5, g.V(), Direction.BOTH);
+        os.close();
     }
 
     protected void deleteFile(final String path) throws IOException {

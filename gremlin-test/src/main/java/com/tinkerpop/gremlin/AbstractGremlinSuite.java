@@ -4,8 +4,10 @@ import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.GraphTest;
 import org.javatuples.Pair;
 import org.junit.runner.Description;
+import org.junit.runner.Runner;
 import org.junit.runner.manipulation.Filter;
 import org.junit.runner.manipulation.NoTestsRemainException;
+import org.junit.runner.notification.RunNotifier;
 import org.junit.runners.Suite;
 import org.junit.runners.model.InitializationError;
 import org.junit.runners.model.RunnerBuilder;
@@ -22,6 +24,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Base Gremlin test suite from which different classes of tests can be exposed to implementers.
@@ -75,6 +78,7 @@ public abstract class AbstractGremlinSuite extends Suite {
 
         // validate public acknowledgement of the test suite and filter out tests ignored by the implementation
         validateOptInToSuite(pair.getValue1());
+        validateOptInAndOutAnnotationsOnGraph(pair.getValue1());
         registerOptOuts(pair.getValue1());
 
         try {
@@ -97,10 +101,6 @@ public abstract class AbstractGremlinSuite extends Suite {
             // validate annotation - test class and reason must be set
             if (!Arrays.stream(optOuts).allMatch(ignore -> ignore.test() != null && ignore.reason() != null && !ignore.reason().isEmpty()))
                 throw new InitializationError("Check @IgnoreTest annotations - all must have a 'test' and 'reason' set");
-
-            // do not allow use of @OptOut on @OptOut validation
-            if (Arrays.stream(optOuts).anyMatch(optOut -> optOut.test().equals(GraphTest.class.getCanonicalName()) && optOut.method().equals("shouldValidateOptInAnnotationsOnGraph")))
-                throw new InitializationError(String.format("A Graph cannot use @OptOut for %s - shouldValidateOptInAnnotationsOnGraph", GraphTest.class));
 
             try {
                 filter(new OptOutTestFilter(optOuts));
@@ -131,13 +131,39 @@ public abstract class AbstractGremlinSuite extends Suite {
         return Pair.with(annotation.provider(), annotation.graph());
     }
 
-    // todo: is this the standard way to assert counts?
-    public static Consumer<Graph> assertVertexEdgeCounts(final int expectedVertexCount, final int expectedEdgeCount) {
-        return (g) -> {
-            assertEquals(new Long(expectedVertexCount), g.V().count().next());
-            assertEquals(new Long(expectedEdgeCount), g.E().count().next());
-        };
+    public static void validateOptInAndOutAnnotationsOnGraph(final Class<? extends Graph> klass) throws InitializationError {
+        // sometimes test names change and since they are String representations they can easily break if a test
+        // is renamed. this test will validate such things.  it is not possible to @OptOut of this test.
+        final Graph.OptOut[] optOuts = klass.getAnnotationsByType(Graph.OptOut.class);
+        for(Graph.OptOut optOut : optOuts) {
+            final Class testClass;
+            try {
+                testClass = Class.forName(optOut.test());
+            } catch (Exception ex) {
+                throw new InitializationError(String.format("Invalid @OptOut on Graph instance.  Could not instantiate test class (it may have been renamed): %s", optOut.test()));
+            }
+
+            if (!Arrays.stream(testClass.getMethods()).anyMatch(m -> m.getName().equals(optOut.method())))
+                throw new InitializationError(String.format("Invalid @OptOut on Graph instance.  Could not match @OptOut test name %s on test class %s (it may have been renamed)", optOut.method(), optOut.test()));
+        }
     }
+
+    @Override
+    protected void runChild(final Runner runner, final RunNotifier notifier) {
+        if (beforeTestExecution((Class<? extends AbstractGremlinTest>) runner.getDescription().getTestClass())) super.runChild(runner, notifier);
+        afterTestExecution((Class<? extends AbstractGremlinTest>) runner.getDescription().getTestClass());
+    }
+
+    /**
+     * Called just prior to test class execution.  Return false to ignore test class. By default this always returns
+     * true.
+     */
+    public boolean beforeTestExecution(final Class<? extends AbstractGremlinTest> testClass) { return true; }
+
+    /**
+     * Called just after test class execution.
+     */
+    public void afterTestExecution(final Class<? extends AbstractGremlinTest> testClass) {}
 
     /**
      * Filter for tests in the suite which is controlled by the {@link Graph.OptOut} annotation.

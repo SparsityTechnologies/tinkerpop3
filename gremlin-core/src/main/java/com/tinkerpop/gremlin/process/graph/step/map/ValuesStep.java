@@ -3,25 +3,23 @@ package com.tinkerpop.gremlin.process.graph.step.map;
 import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.process.util.TraversalHelper;
 import com.tinkerpop.gremlin.structure.Element;
-import com.tinkerpop.gremlin.structure.util.ElementHelper;
 
 import java.util.Arrays;
-import java.util.Map;
 
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class ValuesStep extends MapStep<Element, Map<String, Object>> {
+public final class ValuesStep<E> extends FlatMapStep<Element, E> {
 
-    public String[] propertyKeys;
+    private final String[] propertyKeys;
 
     public ValuesStep(final Traversal traversal, final String... propertyKeys) {
         super(traversal);
         this.propertyKeys = propertyKeys;
-        this.setFunction(traverser -> ElementHelper.propertyMap(traverser.get(), propertyKeys));
+        this.setFunction(traverser -> traverser.get().iterators().valueIterator(propertyKeys));
     }
 
     public String toString() {
-        return TraversalHelper.makeStepString(this, Arrays.asList(this.propertyKeys));
+        return TraversalHelper.makeStepString(this, Arrays.toString(this.propertyKeys));
     }
 }

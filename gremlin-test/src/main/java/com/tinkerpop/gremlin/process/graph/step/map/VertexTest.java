@@ -4,6 +4,7 @@ import com.tinkerpop.gremlin.LoadGraphWith;
 import com.tinkerpop.gremlin.process.AbstractGremlinProcessTest;
 import com.tinkerpop.gremlin.process.T;
 import com.tinkerpop.gremlin.process.Traversal;
+import com.tinkerpop.gremlin.structure.Compare;
 import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Vertex;
@@ -441,9 +442,9 @@ public abstract class VertexTest extends AbstractGremlinProcessTest {
 
     @Test
     @LoadGraphWith(MODERN)
-    public void g_v4_bothE_outV() {
+    public void g_v4_bothE_otherV() {
         final Traversal<Vertex, Vertex> traversal = get_g_v4_bothE_otherV(convertToVertexId("josh"));
-        System.out.println("Testing: " + traversal);
+        printTraversalForm(traversal);
         final List<Vertex> vertices = StreamFactory.stream(traversal).collect(Collectors.toList());
         assertEquals(3, vertices.size());
         assertTrue(vertices.stream().anyMatch(v -> v.value("name").equals("marko")));
@@ -456,7 +457,7 @@ public abstract class VertexTest extends AbstractGremlinProcessTest {
     @LoadGraphWith(MODERN)
     public void g_v4_bothE_hasXweight_LT_1X_otherV() {
         final Traversal<Vertex, Vertex> traversal = get_g_v4_bothE_hasXweight_lt_1X_otherV(convertToVertexId("josh"));
-        System.out.println("Testing: " + traversal);
+        printTraversalForm(traversal);
         final List<Vertex> vertices = StreamFactory.stream(traversal).collect(Collectors.toList());
         assertEquals(1, vertices.size());
         assertEquals(vertices.get(0).value("name"), "lop");
@@ -572,8 +573,8 @@ public abstract class VertexTest extends AbstractGremlinProcessTest {
 
     }
 
-    public static class JavaVertexTest extends VertexTest {
-        public JavaVertexTest() {
+    public static class StandardTest extends VertexTest {
+        public StandardTest() {
             requiresGraphComputer = false;
         }
 
@@ -714,7 +715,7 @@ public abstract class VertexTest extends AbstractGremlinProcessTest {
 
         @Override
         public Traversal<Vertex, Vertex> get_g_v4_bothE_hasXweight_lt_1X_otherV(Object v4Id) {
-            return g.v(v4Id).bothE().has("weight", T.lt, 1d).otherV();
+            return g.v(v4Id).bothE().has("weight", Compare.lt, 1d).otherV();
         }
 
         @Override
@@ -738,10 +739,8 @@ public abstract class VertexTest extends AbstractGremlinProcessTest {
         }
     }
 
-    // todo: some of the graph computer tests do not pass
-
-    public static class JavaComputerVertexTest extends VertexTest {
-        public JavaComputerVertexTest() {
+    public static class ComputerTest extends VertexTest {
+        public ComputerTest() {
             requiresGraphComputer = true;
         }
 
@@ -882,7 +881,7 @@ public abstract class VertexTest extends AbstractGremlinProcessTest {
 
         @Override
         public Traversal<Vertex, Vertex> get_g_v4_bothE_hasXweight_lt_1X_otherV(Object v4Id) {
-            return g.v(v4Id).bothE().has("weight", T.lt, 1d).otherV().submit(g.compute());
+            return g.v(v4Id).bothE().has("weight", Compare.lt, 1d).otherV().submit(g.compute());
         }
 
         @Override

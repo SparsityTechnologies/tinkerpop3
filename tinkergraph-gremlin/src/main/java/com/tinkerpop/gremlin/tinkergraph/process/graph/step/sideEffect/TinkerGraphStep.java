@@ -3,6 +3,7 @@ package com.tinkerpop.gremlin.tinkergraph.process.graph.step.sideEffect;
 import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.GraphStep;
 import com.tinkerpop.gremlin.process.util.TraversalHelper;
+import com.tinkerpop.gremlin.process.util.TraversalMetrics;
 import com.tinkerpop.gremlin.structure.Compare;
 import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Element;
@@ -31,8 +32,10 @@ public class TinkerGraphStep<E extends Element> extends GraphStep<E> {
 
     @Override
     public void generateTraverserIterator(final boolean trackPaths) {
+        if (PROFILING_ENABLED) TraversalMetrics.start(this);
         this.start = Vertex.class.isAssignableFrom(this.returnClass) ? this.vertices() : this.edges();
         super.generateTraverserIterator(trackPaths);
+        if (PROFILING_ENABLED) TraversalMetrics.stop(this);
     }
 
     private Iterator<? extends Edge> edges() {
@@ -58,8 +61,8 @@ public class TinkerGraphStep<E extends Element> extends GraphStep<E> {
     private HasContainer getIndexKey(final Class<? extends Element> indexedClass) {
         final Set<String> indexedKeys = ((TinkerGraph)this.traversal.sideEffects().getGraph()).getIndexedKeys(indexedClass);
         return this.hasContainers.stream()
-                .filter(c -> indexedKeys.contains(c.key) && c.predicate.equals(Compare.EQUAL))
-                .findFirst()
+                .filter(c -> indexedKeys.contains(c.key) && c.predicate.equals(Compare.eq))
+                .findAny()
                 .orElseGet(() -> null);
     }
 

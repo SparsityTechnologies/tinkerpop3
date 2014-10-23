@@ -2,6 +2,7 @@ package com.tinkerpop.gremlin.process.util;
 
 import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.process.TraversalStrategy;
+import com.tinkerpop.gremlin.structure.util.StringFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -13,12 +14,17 @@ import java.util.stream.Collectors;
  */
 public class DefaultStrategies implements Traversal.Strategies {
 
-    private final List<TraversalStrategy> traversalStrategies = new ArrayList<>();
-    private final Traversal traversal;
+    private List<TraversalStrategy> traversalStrategies = new ArrayList<>();
+    protected Traversal traversal;
     private boolean complete = false;
 
     public DefaultStrategies(final Traversal traversal) {
         this.traversal = traversal;
+    }
+
+    @Override
+    public List<TraversalStrategy> toList() {
+        return new ArrayList<>(this.traversalStrategies);
     }
 
     @Override
@@ -53,5 +59,8 @@ public class DefaultStrategies implements Traversal.Strategies {
         return this.complete;
     }
 
-
+    @Override
+    public String toString() {
+        return StringFactory.traversalStrategiesString(this);
+    }
 }

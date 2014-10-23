@@ -13,10 +13,133 @@ Features are the means by which vendors can expose nuanced difference between th
  . *Vertex Features*
  . *Edge Features*
 
+Vertex Properties
+-----------------
+
+image:vertex-properties.png[width=215,float=left] TinkerPop3 introduces the concept of a `VertexProperty<V>`. All the properties of a `Vertex` are a `VertexProperty`. A `VertexProperty` implements `Property` and as such, it has a key/value pair. However, `VertexProperty` also implements `Element` and thus, can have a collection of key/value pairs. Moreover, while an `Edge` can only have one property of key "name" (for example), a `Vertex` can have multiple "name" properties. With the inclusion of vertex properties, two features are introduced which ultimately advance the graph modelers toolkit:
+
+ . Multiple properties (*multi-properties*): a vertex property key can have multiple values (i.e. a vertex can have multiple "name" properties).
+ . Properties on properties (*meta-properties*): a vertex property can have properties (i.e. a vertex property can have key/value data associated with it).
+
+A collection of use cases are itemized below:
+
+ * *Permissions*: Vertex properties can have key/value ACL-type permission information associated with them.
+ * *Auditing*: When a vertex vertex property is manipulated, it can have key/value information attached to it saying who the creator, deletor, etc. are.
+ * *Provenance*: The "name" of a vertex can be declared by multiple users.
+
+A running example using vertex properties is provided below to demonstrate and explain the API.
+
+[source,groovy]
+gremlin> g = TinkerGraph.open()
+==>tinkergraph[vertices:0 edges:0]
+gremlin> v = g.addVertex('name','marko','name','marko a. rodriguez')
+==>v[0]
+gremlin> v.properties().count()
+==>2
+gremlin> v.properties('name').count() <1>
+==>2
+gremlin> v.property('name') <2>
+Multiple properties exist for the provided key, use Vertex.properties(name)
+Display stack trace? [yN]
+gremlin> v.properties()
+==>vp[name->marko]
+==>vp[name->marko a. rodriguez]
+gremlin> v.properties('name')
+==>vp[name->marko]
+==>vp[name->marko a. rodriguez]
+gremlin> vp = v.properties('name').has(value,'marko').next()
+==>vp[name->marko]
+gremlin> vp.property('acl','private') <3>
+==>p[acl->private]
+gremlin> vp = v.properties('name').has(value,'marko a. rodriguez').next()
+==>vp[name->marko a. rodriguez]
+gremlin> vp.property('acl','public')
+==>p[acl->public]
+gremlin> v.properties('name').has('acl','public').value()
+==>marko a. rodriguez
+gremlin> v.properties('name').has('acl','public').remove() <4>
+==>null
+gremlin> v.properties('name').has('acl','public').value()
+gremlin> v.properties('name').has('acl','private').value()
+==>marko
+gremlin> vp = v.properties().next()
+==>vp[name->marko]
+gremlin> vp.properties()
+==>p[acl->private]
+gremlin> vp.property('date',2014) <5>
+==>p[date->2014]
+gremlin> vp.property('creator','stephen')
+==>p[creator->stephen]
+gremlin> vp.properties()
+==>p[date->2014]
+==>p[creator->stephen]
+==>p[acl->private]
+gremlin> v.properties('name').valueMap()
+==>[date:2014, creator:stephen, acl:private]
+gremlin> v.singleProperty('name','okram') <6>
+==>vp[name->okram]
+gremlin> v.property('name')
+==>vp[name->okram]
+
+<1> A vertex can have zero or more properties with the same key associated with it.
+<2> If a vertex has multiple vertex properties for the same key, then `Vertex.property()` is not allowed.
+<3> A vertex vertex property can have standard key/value properties attached to it.
+<4> Vertex property removal is identical to property removal.
+<5> A vertex vertex property can have any number of key/value properties attached to it.
+<6> `Vertex.singleProperty()` is a helper method that will remove all existing key'd properties before adding the new single property.
+
+If the concept of vertex properties is difficult to grasp, then it may be best to think of vertex properties in terms of "literal vertices." A vertex can have an edge to a "literal vertex" that has a single value key/value -- e.g. "value=okram." The edge that points to that literal vertex has an edge-label of "name." The properties on the edge represent the literal vertex's properties. The "literal vertex" can not have any other edges to it (only one from the associated vertex).
+
+[[the-crew-toy-graph]]
+TIP: A toy graph demonstrating all of the new TinkerPop3 graph structure features is available at `TinkerFactory.createTheCrew()` and `data/tinkerpop-crew*`. This graph demonstrates multi-properties, meta-properties, hidden properties, and graph variables.
+
+.TinkerPop Crew
+image::the-crew-graph.png[width=685]
+
+[source,groovy]
+gremlin> g = TinkerFactory.createTheCrew()
+==>tinkergraph[vertices:6 edges:14]
+gremlin> g.V().as('a').properties('location').hasNot('endTime').as('b').
+           select{it.value('name')}{it.value() + ':' + it.value('startTime')} // determine the current location of each person
+==>[a:marko, b:santa fe:2005]
+==>[a:stephen, b:purcellville:2006]
+==>[a:matthias, b:seattle:2014]
+==>[a:daniel, b:aachen:2009]
+gremlin> g.V().has('name','gremlin').inE('uses').
+           orderBy('skill').as('a').
+           outV().as('b').
+             select{it.value('skill')}{it.value('name')} // rank the users of gremlin by their skill level
+==>[a:3, b:matthias]
+==>[a:4, b:marko]
+==>[a:5, b:stephen]
+==>[a:5, b:daniel]
+gremlin> g.variables() // access the global graph variables
+==>variables[size:3]
+gremlin> g.variables().get('creator')
+==>Optional[marko]
+gremlin> g.variables().get('creator').get()
+==>marko
+gremlin> g.V().has('name',g.variables().get('creator').get()).
+           properties('location').as('a').
+           valueMap().as('b').
+             select(['a','b']){it.value()}{it} // get the creator's vertex and for each location, get the associated properties
+==>[a:san diego, b:[startTime:1997, endTime:2001]]
+==>[a:santa cruz, b:[startTime:2001, endTime:2004]]
+==>[a:brussels, b:[startTime:2004, endTime:2005]]
+==>[a:santa fe, b:[startTime:2005]]
+gremlin> g.V().properties('visible') // hidden properties are not accessible via properties()
+gremlin> g.V().as('a').hiddens('visible').value().as('b').select(){it.value('name')}{it} // determine which vertices are visible
+==>[a:marko, b:true]
+==>[a:stephen, b:true]
+==>[a:matthias, b:true]
+==>[a:daniel, b:false]
+==>[a:gremlin, b:true]
+==>[a:tinkergraph, b:false]
+
 Hidden Properties
 -----------------
 
-A hidden property is a property that is hidden from the various property accessor methods. Hidden properties are typically used in situations where administrative data about an element must be stored that is not so much a description of the element itself. An itemization of use cases are presented below.
+image:hidden-properties.png[width=175,float=right] A hidden property is a property that is hidden from the various property accessor methods. Hidden properties are typically used in situations where administrative data about an element must be stored that is not so much a description of the element itself. An itemization of use cases are presented below.
 
  * *Permissions*: What user or groups have read/write permission to this element?
  * *Time keeping*: When was this element created? When does this element expire?
@@ -32,25 +155,31 @@ gremlin> g = TinkerGraph.open()
 gremlin> v = g.addVertex('name','pierre')
 ==>v[0]
 gremlin> v.property('location','belgium')
-==>p[location->belgium]
+==>vp[location->belgium]
 gremlin> v.property(Graph.Key.hide('status'),'user')
-==>p[status->user]
+==>vp[status->user]
 gremlin> v.keys()
 ==>name
 ==>location
 gremlin> v.hiddenKeys()
 ==>status
 gremlin> p = v.property(Graph.Key.hide('status'))
-==>p[status->user]
+==>vp[status->user]
 gremlin> p.isHidden()
 ==>true
 gremlin> v.property('status')
-==>p[empty]
+==>vp[empty]
 
 Graph Variables
 ---------------
 
-TinkerPop3 introduces the concept of `Graph.Variables`. Variables are key/value pairs associated with the graph itself -- in essence, a `Map<String,Object>`. These variables are intended to store metadata about the graph. Examples include: schema information, global permissions data, system user information, etc. An example of their use is presented below in Gremlin-Groovy:
+TinkerPop3 introduces the concept of `Graph.Variables`. Variables are key/value pairs associated with the graph itself -- in essence, a `Map<String,Object>`. These variables are intended to store metadata about the graph. Example use cases include:
+
+ * *Schema information*: What do the namespace prefixes resolve to and when was the schema last modified?
+ * *Global permissions*: What are the access rights for particular groups?
+ * *System user information*: Who are the admins of the system?
+
+An example of graph variables in use is presented below in Gremlin-Groovy:
 
 [source,groovy]
 gremlin> g = TinkerGraph.open()
@@ -237,11 +366,8 @@ The following GraphSON example shows the output of `GraphSonWriter.writeVertex()
 [source,js]
 ----
 {
-    "inV": [],
-    "id": 1,
-    "label": "vertex",
-    "type": "vertex",
-    "outV": [
+    "inE": [],
+    "outE": [
         {
             "inV": 3,
             "inVLabel": "vertex",
@@ -250,6 +376,7 @@ The following GraphSON example shows the output of `GraphSonWriter.writeVertex()
             "label": "created",
             "type": "edge",
             "outV": 1,
+            "hiddens": {},
             "properties": {
                 "weight": 0.4
             }
@@ -262,6 +389,7 @@ The following GraphSON example shows the output of `GraphSonWriter.writeVertex()
             "label": "knows",
             "type": "edge",
             "outV": 1,
+            "hiddens": {},
             "properties": {
                 "weight": 0.5
             }
@@ -274,14 +402,35 @@ The following GraphSON example shows the output of `GraphSonWriter.writeVertex()
             "label": "knows",
             "type": "edge",
             "outV": 1,
+            "hiddens": {},
             "properties": {
                 "weight": 1
             }
         }
     ],
+    "id": 1,
+    "label": "vertex",
+    "type": "vertex",
+    "hiddens": {},
     "properties": {
-        "name": "marko",
-        "age": 29
+        "name": [
+            {
+                "id": 0,
+                "label": "name",
+                "hiddens": {},
+                "value": "marko",
+                "properties": {}
+            }
+        ],
+        "age": [
+            {
+                "id": 1,
+                "label": "age",
+                "hiddens": {},
+                "value": 29,
+                "properties": {}
+            }
+        ]
     }
 }
 ----
@@ -302,14 +451,11 @@ In the above code, the `embedTypes` option is set to `true` and the output below
 ----
 {
     "@class": "java.util.HashMap",
-    "inV": [
+    "inE": [
         "java.util.ArrayList",
         []
     ],
-    "id": 1,
-    "label": "vertex",
-    "type": "vertex",
-    "outV": [
+    "outE": [
         "java.util.ArrayList",
         [
             {
@@ -321,6 +467,9 @@ In the above code, the `embedTypes` option is set to `true` and the output below
                 "label": "created",
                 "type": "edge",
                 "outV": 1,
+                "hiddens": {
+                    "@class": "java.util.HashMap"
+                },
                 "properties": {
                     "@class": "java.util.HashMap",
                     "weight": [
@@ -338,6 +487,9 @@ In the above code, the `embedTypes` option is set to `true` and the output below
                 "label": "knows",
                 "type": "edge",
                 "outV": 1,
+                "hiddens": {
+                    "@class": "java.util.HashMap"
+                },
                 "properties": {
                     "@class": "java.util.HashMap",
                     "weight": [
@@ -355,6 +507,9 @@ In the above code, the `embedTypes` option is set to `true` and the output below
                 "label": "knows",
                 "type": "edge",
                 "outV": 1,
+                "hiddens": {
+                    "@class": "java.util.HashMap"
+                },
                 "properties": {
                     "@class": "java.util.HashMap",
                     "weight": [
@@ -365,10 +520,54 @@ In the above code, the `embedTypes` option is set to `true` and the output below
             }
         ]
     ],
+    "id": 1,
+    "label": "vertex",
+    "type": "vertex",
+    "hiddens": {
+        "@class": "java.util.HashMap"
+    },
     "properties": {
         "@class": "java.util.HashMap",
-        "name": "marko",
-        "age": 29
+        "name": [
+            "java.util.ArrayList",
+            [
+                {
+                    "@class": "java.util.HashMap",
+                    "id": [
+                        "java.lang.Long",
+                        0
+                    ],
+                    "label": "name",
+                    "hiddens": {
+                        "@class": "java.util.HashMap"
+                    },
+                    "value": "marko",
+                    "properties": {
+                        "@class": "java.util.HashMap"
+                    }
+                }
+            ]
+        ],
+        "age": [
+            "java.util.ArrayList",
+            [
+                {
+                    "@class": "java.util.HashMap",
+                    "id": [
+                        "java.lang.Long",
+                        1
+                    ],
+                    "label": "age",
+                    "hiddens": {
+                        "@class": "java.util.HashMap"
+                    },
+                    "value": 29,
+                    "properties": {
+                        "@class": "java.util.HashMap"
+                    }
+                }
+            ]
+        ]
     }
 }
 ----
@@ -468,7 +667,7 @@ gremlin> conf = new BaseConfiguration()
 gremlin> conf.setProperty("gremlin.graph","com.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph")
 ==>null
 gremlin> g = GraphFactory.open(conf, new ReadOnlyGraphStrategy())
-==>[readonlygraphstrategy[tinkergraph[vertices:0 edges:0]]]
+==>readonlygraphstrategy[tinkergraph[vertices:0 edges:0]]
 ----
 
 The above code specifies the creation of a `TinkerGraph` with the use of `ReadOnlyGraphStrategy`.  Note that the `GraphFactory` does not return a `TinkerGraph` instance.  It returns a `StrategyWrappedGraph` which is a traverser for the underlying `TinkerGraph` and the `ReadOnlyGraphStrategy`.  Since `StrategyWrappedGraph` implements the `Graph` interface, it can be used in the same manner as `TinkerGraph` or any other implementation.
@@ -491,37 +690,48 @@ gremlin> g.v(0l).value('name')
 ==>stephen
 ----
 
-By getting the "base graph" (i.e. the underlying `TinkerGraph`) it is possible to mutate the graph.  The above code demonstrates that and also shows that it then possible to read back that added vertex.
+By getting the "base graph" (i.e. the underlying `TinkerGraph`) it is possible to mutate the graph.  The above code demonstrates that and also shows that it then possible to read back that added vertex. The following sections explain details of the specific `GraphStrategy` implementations.
 
-Further details on specific GraphStrategy implementations follow.
+IdGraphStrategy
+~~~~~~~~~~~~~~~
 
-SubgraphStrategy
-~~~~~~~~~~~~~~~~
+`IdGraphStrategy` which affords complete control over element identifiers. Some `Graph` implementations, such as `TinkerGraph`, allow specification of custom identifiers when creating elements:
 
-A general-purpose `SubgraphStrategy` is created by defining a "vertex criterion" and an "edge criterion" as Java 8 `Predicates` and applying them to a `Graph`.  All vertices present in the base `Graph` which pass the vertex criterion will be present in the `StrategyWrappedGraph`.  All edges present in the base `Graph` which pass the edge criterion *and* whose in- and out-vertices both pass the vertex criterion will be present in the `StrategyWrappedGraph`.
+[source,groovy]
+gremlin> g = TinkerGraph.open()
+==>tinkergraph[vertices:0 edges:0]
+gremlin> v = g.addVertex(id, "42a")
+==>v[42a]
+gremlin> g.v("42a")
+==>v[42a]
 
-NOTE: edges are either entirely visible, or entirely invisible to a subgraph.  You will never find an edge which cannot be traversed due to a missing in- or out-vertex.
+Other `Graph` implementations, however, generate element identifiers automatically and cannot be assigned:
 
-For example:
+[source,groovy]
+gremlin> g = Neo4jGraph.open('/tmp/neo4j')
+==>neo4jgraph[EmbeddedGraphDatabase [/tmp/neo4j]]
+gremlin> v = g.addVertex(id, "42a")
+Vertex does not support user supplied identifiers
+Display stack trace? [yN]
 
-[source,java]
-----
-Graph g = TinkerFactory.createClassic();              
+Given the nature of identifier assignment, this means that identifiers are generally not conserved when moving data between graph instances and implementations, to XML and back again, etc. So for applications which need it, there is `IdGraphStrategy`. Using vertex and edge indices under the hood, `IdGraphStrategy` enables custom identifiers irrespective of whether or not the underlying `Graph` implementation allows them.
 
-Predicate<Vertex> vertexCriterion = vertex -> true;
-Predicate<Edge> edgeCriterion = edge -> (int) edge.id() >= 8 && (int) edge.id() <= 10;
+[source,groovy]
+gremlin> g = Neo4jGraph.open('/tmp/neo4j')
+==>neo4jgraph[EmbeddedGraphDatabase [/tmp/neo4j]]
+gremlin> swg = new StrategyWrappedGraph(g)
+==>defaultgraphstrategy[neo4jgraph[EmbeddedGraphDatabase [/tmp/neo4j]]]
+gremlin> swg.strategy().setGraphStrategy(IdGraphStrategy.build("idKey").create())
+==>null
+gremlin> swg.addVertex(id,"42a").id()
+==>42a
+gremlin> swg.addVertex().id()
+==>ef74e843-4c6e-40d2-929f-2552e2f96bf2
 
-GraphStrategy strategy = new SubgraphStrategy(vertexCriterion, edgeCriterion);
-StrategyWrappedGraph sg = new StrategyWrappedGraph(g);
-sg.strategy().setGraphStrategy(strategy);
+When a non-null identifier is passed to `IdGraph.addVertex` or `IdGraph.addEdge`, that value will be used to uniquely identify the element. When the `id` is not provided, `IdGraph` will generate an identifier on its own.
 
-// all vertices are here
-System.out.println("" + sg.V().count() + " of " + g.V().count() + " vertices");
+IMPORTANT: The key that is used to store the assigned identifier should be indexed in the underlying graph database.  If it is not indexed, then lookups for the elements that use these identifiers will perform a linear scan.
 
-// only the given edges are included
-System.out.println("" + sg.E().count() + " of " + g.E().count() + " edges");
-----
- 
 PartitionGraphStrategy
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -534,7 +744,7 @@ gremlin> g = TinkerGraph.open()
 gremlin> strategy = new PartitionGraphStrategy(Graph.Key.hide("partition"), "A")
 ==>PartitionGraphStrategy
 gremlin> sg = new StrategyWrappedGraph(g)
-==>[passthru[tinkergraph[vertices:0 edges:0]]]
+==>strategywrappedgraph[tinkergraph[vertices:0 edges:0]]
 gremlin> sg.strategy().setGraphStrategy(strategy)
 ==>null
 ----
@@ -544,17 +754,17 @@ Add vertices and edges first in one partition, then another:
 [source,groovy]
 ----
 gremlin> v1 = sg.addVertex("name", "one")
-==>[PartitionGraphStrategy[v[0]]]
+==>partitiongraphstrategy[v[0]]
 gremlin> v2 = sg.addVertex("name", "two")
-==>[PartitionGraphStrategy[v[1]]]
+==>partitiongraphstrategy[v[1]]
 gremlin> v1.addEdge("knows", v2)
-==>[PartitionGraphStrategy[e[2][0-knows->1]]]
+==>partitiongraphstrategy[e[2][0-knows->1]]
 gremlin> strategy.setWritePartition("B")
 ==>null
 gremlin> v3 = sg.addVertex("name", "three")
-==>[PartitionGraphStrategy[v[3]]]
+==>partitiongraphstrategy[v[3]]
 gremlin> v1.addEdge("knows", v3)
-==>[PartitionGraphStrategy[e[4][0-knows->3]]]
+==>partitiongraphstrategy[e[4][0-knows->3]]
 gremlin> 
 ----
 
@@ -577,3 +787,62 @@ gremlin> "in B: " + sg.V().count().next() + ", " + sg.E().count().next()
 ----
 
 Note that there are no edges in the set B, as the only edge added to partition B is incident on a vertex of A.
+
+ReadOnlyGraphStrategy
+~~~~~~~~~~~~~~~~~~~~~
+
+`ReadOnlyGraphStrategy` was demonstrated at the start of the `GraphStrategy` section.  It simply prevents write operations that would otherwise mutate the `Graph`.
+
+[source,groovy]
+----
+gremlin> conf = new BaseConfiguration()
+==>org.apache.commons.configuration.BaseConfiguration@5b40ceb
+gremlin> conf.setProperty("gremlin.graph","com.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph")
+==>null
+gremlin> g = GraphFactory.open(conf, new ReadOnlyGraphStrategy())
+==>readonlygraphstrategy[tinkergraph[vertices:0 edges:0]]
+gremlin> g.addVertex('name','stephen')
+Graph uses class com.tinkerpop.gremlin.structure.strategy.ReadOnlyGraphStrategy and is therefore unmodifiable
+----
+
+SequenceGraphStrategy
+~~~~~~~~~~~~~~~~~~~~~
+
+`SequenceGraphStrategy` provides a way to string together a set of `GraphStrategy` implementations, such that they are executed in order from first to last.  The `GraphFactory` provides a straightforward way to invisibly use `SequenceGraphStrategy`:
+
+[source,groovy]
+gremlin> conf = new BaseConfiguration()
+==>org.apache.commons.configuration.BaseConfiguration@6048e26a
+gremlin> conf.setProperty("gremlin.graph",TinkerGraph.class.getName())
+==>null
+gremlin> g = GraphFactory.open(conf, new ReadOnlyGraphStrategy(), new PartitionGraphStrategy("partition","A"))
+==>sequencegraphstrategy[tinkergraph[vertices:0 edges:0]]
+
+The above code demonstrates a `Graph` that uses a `SequenceGraphStrategy` composed of `ReadOnlyGraphStrategy` and `PartitionGraphStrategy`.  When the `SequenceGraphStrategy` is invoked, it will first apply the `ReadOnlyGraphStrategy` and then apply the `PartitionGraphStrategy`.  It is important to consider the ordering of the `GraphStrategy` objects when choosing to use `SequenceGraphStrategy` as it makes no attempts to determine if strategies will be in conflict with one another.  Be aware of the nature of the strategies and ensure that applying them in the order assigned will produce the desirable outcome.
+
+SubgraphStrategy
+~~~~~~~~~~~~~~~~
+
+A general-purpose `SubgraphStrategy` is created by defining a "vertex criterion" and an "edge criterion" as Java 8 `Predicates` and applying them to a `Graph`.  All vertices present in the base `Graph` which pass the vertex criterion will be present in the `StrategyWrappedGraph`.  All edges present in the base `Graph` which pass the edge criterion *and* whose in- and out-vertices both pass the vertex criterion will be present in the `StrategyWrappedGraph`.
+
+NOTE: edges are either entirely visible, or entirely invisible to a subgraph.  You will never find an edge which cannot be traversed due to a missing in- or out-vertex.
+
+For example:
+
+[source,java]
+----
+Graph g = TinkerFactory.createClassic();
+
+Predicate<Vertex> vertexCriterion = vertex -> true;
+Predicate<Edge> edgeCriterion = edge -> (int) edge.id() >= 8 && (int) edge.id() <= 10;
+
+GraphStrategy strategy = new SubgraphStrategy(vertexCriterion, edgeCriterion);
+StrategyWrappedGraph sg = new StrategyWrappedGraph(g);
+sg.strategy().setGraphStrategy(strategy);
+
+// all vertices are here
+System.out.println("" + sg.V().count() + " of " + g.V().count() + " vertices");
+
+// only the given edges are included
+System.out.println("" + sg.E().count() + " of " + g.E().count() + " edges");
+----

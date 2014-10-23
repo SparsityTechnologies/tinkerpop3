@@ -14,7 +14,7 @@ import java.lang.reflect.Constructor;
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class GiraphMap extends Mapper<NullWritable, GiraphInternalVertex, KryoWritable, KryoWritable> {
+public final class GiraphMap extends Mapper<NullWritable, GiraphInternalVertex, KryoWritable, KryoWritable> {
 
     private MapReduce mapReduce;
 
@@ -37,7 +37,7 @@ public class GiraphMap extends Mapper<NullWritable, GiraphInternalVertex, KryoWr
 
     @Override
     public void map(final NullWritable key, final GiraphInternalVertex value, final Mapper<NullWritable, GiraphInternalVertex, KryoWritable, KryoWritable>.Context context) throws IOException, InterruptedException {
-        this.mapReduce.map(value.getTinkerVertex(), new GiraphMapEmitter<>(context));
+        this.mapReduce.map(value.getBaseVertex(), new GiraphMapEmitter<>(context));
     }
 
     public static class GiraphMapEmitter<K, V> implements MapReduce.MapEmitter<K, V> {
@@ -56,7 +56,7 @@ public class GiraphMap extends Mapper<NullWritable, GiraphInternalVertex, KryoWr
             this.valueWritable.set(value);
             try {
                 this.context.write(this.keyWritable, this.valueWritable);
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 throw new IllegalStateException(e.getMessage(), e);
             }
         }

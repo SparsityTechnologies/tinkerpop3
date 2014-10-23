@@ -1,5 +1,6 @@
 package com.tinkerpop.gremlin.giraph.structure.io.graphson;
 
+import com.tinkerpop.gremlin.giraph.GiraphGraphProvider;
 import com.tinkerpop.gremlin.giraph.structure.util.GiraphInternalVertex;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
@@ -33,7 +34,7 @@ public class GraphSONRecordReaderWriterTest {
         conf.set("fs.file.impl", LocalFileSystem.class.getName());
         conf.set("fs.default.name", "file:///");
 
-        File testFile = new File(this.getClass().getResource("grateful-dead-vertices.ldjson").getPath());
+        File testFile = new File(GiraphGraphProvider.PATHS.get("grateful-dead-vertices.ldjson"));
         FileSplit split = new FileSplit(
                 new Path(testFile.getAbsoluteFile().toURI().toString()), 0,
                 testFile.length(), null);
@@ -60,8 +61,8 @@ public class GraphSONRecordReaderWriterTest {
                 GiraphInternalVertex v = (GiraphInternalVertex) reader.getCurrentValue();
                 writer.write(NullWritable.get(), v);
 
-                Vertex vertex = v.getTinkerVertex();
-                assertEquals(String.class, vertex.id().getClass());
+                Vertex vertex = v.getBaseVertex();
+                assertEquals(Integer.class, vertex.id().getClass());
 
                 Object value = vertex.property("name");
                 if (null != value && ((Property) value).value().equals("SUGAR MAGNOLIA")) {
@@ -81,7 +82,7 @@ public class GraphSONRecordReaderWriterTest {
         assertEquals(808, lines.length);
         String line42 = lines[41];
         assertTrue(line42.contains("outVLabel"));
-        assertTrue(line42.contains("Jorma"));
+        assertTrue(line42.contains("ITS ALL OVER NOW"));
 
     }
 

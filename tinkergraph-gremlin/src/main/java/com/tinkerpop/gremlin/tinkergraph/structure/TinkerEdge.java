@@ -1,22 +1,23 @@
 package com.tinkerpop.gremlin.tinkergraph.structure;
 
+import com.tinkerpop.gremlin.process.T;
 import com.tinkerpop.gremlin.process.graph.GraphTraversal;
 import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
-import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
 import com.tinkerpop.gremlin.structure.util.ElementHelper;
 import com.tinkerpop.gremlin.structure.util.StringFactory;
 import com.tinkerpop.gremlin.tinkergraph.process.graph.TinkerElementTraversal;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Set;
 
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class TinkerEdge extends TinkerElement implements Edge {
+public class TinkerEdge extends TinkerElement implements Edge, Edge.Iterators {
 
     protected final Vertex inVertex;
     protected final Vertex outVertex;
@@ -25,22 +26,23 @@ public class TinkerEdge extends TinkerElement implements Edge {
         super(id, label, graph);
         this.outVertex = outVertex;
         this.inVertex = inVertex;
-        this.graph.edgeIndex.autoUpdate(Element.LABEL, this.label, null, this);
+        this.graph.edgeIndex.autoUpdate(T.label.getAccessor(), this.label, null, this);
     }
 
     @Override
     public <V> Property<V> property(final String key, final V value) {
-        if (this.graph.graphView != null && this.graph.graphView.getInUse()) {
+        if (TinkerHelper.inComputerMode(this.graph)) {
             return this.graph.graphView.setProperty(this, key, value);
         } else {
             ElementHelper.validateProperty(key, value);
             final Property oldProperty = super.property(key);
-            final Property newProperty = new TinkerProperty<>(this, key, value);
-            this.properties.put(key, newProperty);
+            final Property<V> newProperty = new TinkerProperty<>(this, key, value);
+            this.properties.put(key, Arrays.asList(newProperty));
             this.graph.edgeIndex.autoUpdate(key, value, oldProperty.isPresent() ? oldProperty.value() : null, this);
             return newProperty;
         }
     }
+
 
     @Override
     public void remove() {
@@ -63,20 +65,36 @@ public class TinkerEdge extends TinkerElement implements Edge {
         this.properties.clear();
     }
 
-    public String toString() {
-        return StringFactory.edgeString(this);
-
-    }
-
-    //////
-
     @Override
     public GraphTraversal<Edge, Edge> start() {
         return new TinkerElementTraversal<>(this, this.graph);
     }
 
     @Override
-    public Iterator<Vertex> vertices(final Direction direction) {
-        return (Iterator) TinkerHelper.getVertices(this, direction);
+    public String toString() {
+        return StringFactory.edgeString(this);
+
+    }
+
+    //////////////////////////////////////////////
+
+    @Override
+    public Edge.Iterators iterators() {
+        return this;
+    }
+
+    @Override
+    public Iterator<Vertex> vertexIterator(final Direction direction) {
+        return (Iterator) TinkerHelper.getVertices(TinkerEdge.this, direction);
+    }
+
+    @Override
+    public <V> Iterator<Property<V>> propertyIterator(final String... propertyKeys) {
+        return (Iterator) super.propertyIterator(propertyKeys);
+    }
+
+    @Override
+    public <V> Iterator<Property<V>> hiddenPropertyIterator(final String... propertyKeys) {
+        return (Iterator) super.hiddenPropertyIterator(propertyKeys);
     }
 }

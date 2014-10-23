@@ -1,10 +1,12 @@
 package com.tinkerpop.gremlin.structure.util;
 
+import com.tinkerpop.gremlin.process.T;
 import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.VertexProperty;
 import org.javatuples.Pair;
 
 import java.util.ArrayList;
@@ -28,11 +30,34 @@ import java.util.stream.Stream;
  */
 public class ElementHelper {
 
+    /**
+     * Determine whether the Element label can be legally set. This is typically used as a pre-condition check.
+     *
+     * @param label the element label
+     * @throws IllegalArgumentException whether the label is legal and if not, a clear reason exception is provided
+     */
+    public static void validateLabel(final String label) throws IllegalArgumentException {
+        if (null == label)
+            throw Element.Exceptions.labelCanNotBeNull();
+        if (label.isEmpty())
+            throw Element.Exceptions.labelCanNotBeEmpty();
+        if (Graph.System.isSystem(label))
+            throw Element.Exceptions.labelCanNotBeASystemKey(label);
+    }
+
+    /**
+     * Check if the vertex, by ID, exists. If it does return it, else create it and return it.
+     *
+     * @param graph the graph to check for the existence of the vertex
+     * @param id    the id of the vertex to look for
+     * @param label the label of the vertex to set if the vertex does not exist
+     * @return a pre-existing vertex or a newly created vertex
+     */
     public static Vertex getOrAddVertex(final Graph graph, final Object id, final String label) {
         try {
             return graph.v(id);
         } catch (final NoSuchElementException e) {
-            return graph.addVertex(Element.ID, id, Element.LABEL, label);
+            return graph.addVertex(T.id, id, T.label, label);
         }
     }
 
@@ -50,12 +75,10 @@ public class ElementHelper {
             throw Property.Exceptions.propertyValueCanNotBeNull();
         if (null == key)
             throw Property.Exceptions.propertyKeyCanNotBeNull();
-        if (key.equals(Element.ID))
-            throw Property.Exceptions.propertyKeyIdIsReserved();
-        if (key.equals(Element.LABEL))
-            throw Property.Exceptions.propertyKeyLabelIsReserved();
         if (key.isEmpty())
             throw Property.Exceptions.propertyKeyCanNotBeEmpty();
+        if (Graph.System.isSystem(key))
+            throw Property.Exceptions.propertyKeyCanNotBeASystemKey(key);
     }
 
     /**
@@ -69,21 +92,21 @@ public class ElementHelper {
         if (propertyKeyValues.length % 2 != 0)
             throw Element.Exceptions.providedKeyValuesMustBeAMultipleOfTwo();
         for (int i = 0; i < propertyKeyValues.length; i = i + 2) {
-            if (!(propertyKeyValues[i] instanceof String))
+            if (!(propertyKeyValues[i] instanceof String) && !(propertyKeyValues[i] instanceof T))
                 throw Element.Exceptions.providedKeyValuesMustHaveALegalKeyOnEvenIndices();
         }
     }
 
     /**
-     * Extracts the value of the {@link com.tinkerpop.gremlin.structure.Element#ID} key from the list of arguments.
+     * Extracts the value of the {@link com.tinkerpop.gremlin.process.T#id} key from the list of arguments.
      *
      * @param keyValues a list of key/value pairs
-     * @return the value associated with {@link com.tinkerpop.gremlin.structure.Element#ID}
-     * @throws NullPointerException if the value for the {@link com.tinkerpop.gremlin.structure.Element#ID} key is {@code null}
+     * @return the value associated with {@link com.tinkerpop.gremlin.process.T#id}
+     * @throws NullPointerException if the value for the {@link com.tinkerpop.gremlin.process.T#id} key is {@code null}
      */
     public static Optional<Object> getIdValue(final Object... keyValues) {
         for (int i = 0; i < keyValues.length; i = i + 2) {
-            if (keyValues[i].equals(Element.ID))
+            if (keyValues[i].equals(T.id))
                 return Optional.of(keyValues[i + 1]);
         }
         return Optional.empty();
@@ -95,6 +118,15 @@ public class ElementHelper {
      * there are no values left, the key value list is returned as empty.
      */
     public static Optional<Object[]> remove(final String keyToRemove, final Object... keyValues) {
+        return ElementHelper.remove((Object) keyToRemove, keyValues);
+    }
+
+    public static Optional<Object[]> remove(final T accessor, final Object... keyValues) {
+        return ElementHelper.remove((Object) accessor, keyValues);
+    }
+
+
+    private static Optional<Object[]> remove(final Object keyToRemove, final Object... keyValues) {
         final List list = Arrays.asList(keyValues);
         final List revised = IntStream.range(0, list.size())
                 .filter(i -> i % 2 == 0)
@@ -160,24 +192,26 @@ public class ElementHelper {
     }
 
     /**
-     * Extracts the value of the {@link com.tinkerpop.gremlin.structure.Element#LABEL} key from the list of arguments.
+     * Extracts the value of the {@link com.tinkerpop.gremlin.process.T#label} key from the list of arguments.
      *
      * @param keyValues a list of key/value pairs
-     * @return the value associated with {@link com.tinkerpop.gremlin.structure.Element#LABEL}
+     * @return the value associated with {@link com.tinkerpop.gremlin.process.T#label}
      * @throws ClassCastException   if the value of the label is not a {@link String}
-     * @throws NullPointerException if the value for the {@link com.tinkerpop.gremlin.structure.Element#LABEL} key is {@code null}
+     * @throws NullPointerException if the value for the {@link com.tinkerpop.gremlin.process.T#label} key is {@code null}
      */
     public static Optional<String> getLabelValue(final Object... keyValues) {
         for (int i = 0; i < keyValues.length; i = i + 2) {
-            if (keyValues[i].equals(Element.LABEL))
+            if (keyValues[i].equals(T.label)) {
+                ElementHelper.validateLabel((String) keyValues[i + 1]);
                 return Optional.of((String) keyValues[i + 1]);
+            }
         }
         return Optional.empty();
     }
 
     /**
-     * Assign key/value pairs as properties to an {@link com.tinkerpop.gremlin.structure.Element}.  If the value of {@link com.tinkerpop.gremlin.structure.Element#ID} or
-     * {@link com.tinkerpop.gremlin.structure.Element#LABEL} is in the set of pairs, then they are ignored.
+     * Assign key/value pairs as properties to an {@link com.tinkerpop.gremlin.structure.Element}.  If the value of {@link com.tinkerpop.gremlin.process.T#id} or
+     * {@link com.tinkerpop.gremlin.process.T#label} is in the set of pairs, then they are ignored.
      *
      * @param element           the graph element to assign the {@code propertyKeyValues}
      * @param propertyKeyValues the key/value pairs to assign to the {@code element}
@@ -189,8 +223,27 @@ public class ElementHelper {
             throw Graph.Exceptions.argumentCanNotBeNull("element");
 
         for (int i = 0; i < propertyKeyValues.length; i = i + 2) {
-            if (!propertyKeyValues[i].equals(Element.ID) && !propertyKeyValues[i].equals(Element.LABEL))
+            if (!propertyKeyValues[i].equals(T.id) && !propertyKeyValues[i].equals(T.label))
                 element.property((String) propertyKeyValues[i], propertyKeyValues[i + 1]);
+        }
+    }
+
+    /**
+     * Assign key/value pairs as properties to an {@link com.tinkerpop.gremlin.structure.Vertex}.  If the value of {@link com.tinkerpop.gremlin.process.T#id} or
+     * {@link com.tinkerpop.gremlin.process.T#label} is in the set of pairs, then they are ignored.
+     *
+     * @param vertex            the vertex to assign the {@code propertyKeyValues}
+     * @param propertyKeyValues the key/value pairs to assign to the {@code vertex}
+     * @throws ClassCastException       if the value of the key is not a {@link String}
+     * @throws IllegalArgumentException if the value of {@code vertex} is null
+     */
+    public static void attachSingleProperties(final Vertex vertex, final Object... propertyKeyValues) {
+        if (null == vertex)
+            throw Graph.Exceptions.argumentCanNotBeNull("vertex");
+
+        for (int i = 0; i < propertyKeyValues.length; i = i + 2) {
+            if (!propertyKeyValues[i].equals(T.id) && !propertyKeyValues[i].equals(T.label))
+                vertex.singleProperty((String) propertyKeyValues[i], propertyKeyValues[i + 1]);
         }
     }
 
@@ -208,11 +261,11 @@ public class ElementHelper {
     public static Object[] getProperties(final Element element, final boolean includeId, final boolean includeLabel, final Set<String> propertiesToCopy, final Set<String> hiddenPropertiesToCopy) {
         final List<Object> keyValues = new ArrayList<>();
         if (includeId) {
-            keyValues.add(Element.ID);
+            keyValues.add(T.id);
             keyValues.add(element.id());
         }
         if (includeLabel) {
-            keyValues.add(Element.LABEL);
+            keyValues.add(T.label);
             keyValues.add(element.label());
         }
         element.keys().forEach(key -> {
@@ -233,7 +286,7 @@ public class ElementHelper {
 
     /**
      * A standard method for determining if two {@link com.tinkerpop.gremlin.structure.Element} objects are equal. This method should be used by any
-     * {@link Object#equals(Object)} implementation to ensure consistent behavior.
+     * {@link Object#equals(Object)} implementation to ensure consistent behavior. This method is used for Vertex, Edge, and VertexProperty.
      *
      * @param a The first {@link com.tinkerpop.gremlin.structure.Element}
      * @param b The second {@link com.tinkerpop.gremlin.structure.Element} (as an {@link Object})
@@ -248,9 +301,23 @@ public class ElementHelper {
 
         if (a == b)
             return true;
-        if (!((a instanceof Vertex && b instanceof Vertex) || (a instanceof Edge && b instanceof Edge)))
+        if (!((a instanceof Vertex && b instanceof Vertex) ||
+                (a instanceof Edge && b instanceof Edge) ||
+                (a instanceof VertexProperty && b instanceof VertexProperty)))
             return false;
         return haveEqualIds(a, (Element) b);
+    }
+
+    /**
+     * A standard method for determining if two {@link com.tinkerpop.gremlin.structure.VertexProperty} objects are equal. This method should be used by any
+     * {@link Object#equals(Object)} implementation to ensure consistent behavior.
+     *
+     * @param a the first {@link com.tinkerpop.gremlin.structure.VertexProperty}
+     * @param b the second {@link com.tinkerpop.gremlin.structure.VertexProperty}
+     * @return true if equal and false otherwise
+     */
+    public static boolean areEqual(final VertexProperty a, final Object b) {
+        return ElementHelper.areEqual((Element) a, b);
     }
 
     /**
@@ -286,24 +353,94 @@ public class ElementHelper {
             return true;
         if (!a.isPresent() && ((Property) b).isPresent() || a.isPresent() && !((Property) b).isPresent())
             return false;
-        return a.key().equals(((Property) b).key()) && a.value().equals(((Property) b).value()) && areEqual(a.getElement(), ((Property) b).getElement());
+        return a.key().equals(((Property) b).key()) && a.value().equals(((Property) b).value()) && areEqual(a.element(), ((Property) b).element());
 
     }
 
-    public static Map<String, Object> propertyMap(final Element element, final String... propertyKeys) {
+    public static Map<String, Object> propertyValueMap(final Element element, final boolean getHiddens, final String... propertyKeys) {
         final Map<String, Object> values = new HashMap<>();
-        if (null == propertyKeys || propertyKeys.length == 0) {
-            element.keys().forEach(key -> values.put(key, element.value(key)));
+        if (propertyKeys.length == 0) {
+            (getHiddens ? element.iterators().hiddenPropertyIterator() : element.iterators().propertyIterator()).forEachRemaining(property -> values.put(property.key(), property.value()));
         } else {
             for (final String key : propertyKeys) {
-                if (key.equals(Element.ID))
-                    values.put(Element.ID, element.id());
-                else if (key.equals(Element.LABEL))
-                    values.put(Element.LABEL, element.label());
-                else
-                    element.property(key).ifPresent(v -> values.put(key, v));
+                if (!Graph.Key.isHidden(key)) {
+                    element.property(getHiddens ? Graph.Key.hide(key) : key).ifPresent(v -> values.put(key, v));
+                }
             }
         }
         return values;
+    }
+
+    public static Map<String, Property> propertyMap(final Element element, final boolean getHiddens, final String... propertyKeys) {
+        final Map<String, Property> propertyMap = new HashMap<>();
+        if (propertyKeys.length == 0) {
+            (getHiddens ? element.iterators().hiddenPropertyIterator() : element.iterators().propertyIterator()).forEachRemaining(property -> propertyMap.put(property.key(), property));
+        } else {
+            for (final String key : propertyKeys) {
+                if (!Graph.Key.isHidden(key)) {
+                    final Property property = element.property(getHiddens ? Graph.Key.hide(key) : key);
+                    if (property.isPresent()) propertyMap.put(key, property);
+                }
+            }
+        }
+        return propertyMap;
+    }
+
+    public static Map<String, List> vertexPropertyValueMap(final Vertex vertex, final boolean getHiddens, final String... propertyKeys) {
+        final Map<String, List> valueMap = new HashMap<>();
+        if (propertyKeys.length == 0) {
+            (getHiddens ? vertex.iterators().hiddenPropertyIterator() : vertex.iterators().propertyIterator()).forEachRemaining(property -> {
+                if (valueMap.containsKey(property.key()))
+                    valueMap.get(property.key()).add(property.value());
+                else {
+                    final List list = new ArrayList();
+                    list.add(property.value());
+                    valueMap.put(property.key(), list);
+                }
+            });
+        } else {
+            for (final String key : propertyKeys) {
+                if (!Graph.Key.isHidden(key)) {
+                    if (valueMap.containsKey(key)) {
+                        final List list = valueMap.get(key);
+                        (getHiddens ? vertex.iterators().hiddenPropertyIterator(key) : vertex.iterators().propertyIterator(key)).forEachRemaining(property -> list.add(property.value()));
+                    } else {
+                        final List list = new ArrayList();
+                        (getHiddens ? vertex.iterators().hiddenPropertyIterator(key) : vertex.iterators().propertyIterator(key)).forEachRemaining(property -> list.add(property.value()));
+                        if (list.size() > 0)
+                            valueMap.put(key, list);
+                    }
+                }
+            }
+        }
+        return valueMap;
+    }
+
+    public static Map<String, List<VertexProperty>> vertexPropertyMap(final Vertex vertex, final boolean getHiddens, final String... propertyKeys) {
+        final Map<String, List<VertexProperty>> propertyMap = new HashMap<>();
+        if (null == propertyKeys || propertyKeys.length == 0) {
+            (getHiddens ? vertex.iterators().hiddenPropertyIterator() : vertex.iterators().propertyIterator()).forEachRemaining(property -> {
+                if (propertyMap.containsKey(property.key()))
+                    propertyMap.get(property.key()).add(property);
+                else {
+                    final List list = new ArrayList();
+                    list.add(property);
+                    propertyMap.put(property.key(), list);
+                }
+            });
+        } else {
+            for (final String key : propertyKeys) {
+                if (propertyMap.containsKey(key)) {
+                    final List list = propertyMap.get(key);
+                    (getHiddens ? vertex.iterators().hiddenPropertyIterator(key) : vertex.iterators().propertyIterator(key)).forEachRemaining(list::add);
+                } else {
+                    final List list = new ArrayList();
+                    (getHiddens ? vertex.iterators().hiddenPropertyIterator(key) : vertex.iterators().propertyIterator(key)).forEachRemaining(list::add);
+                    if (list.size() > 0)
+                        propertyMap.put(key, list);
+                }
+            }
+        }
+        return propertyMap;
     }
 }

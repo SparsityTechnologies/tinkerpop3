@@ -1,9 +1,7 @@
 package com.tinkerpop.gremlin.giraph.groovy.plugin;
 
-import com.tinkerpop.gremlin.giraph.process.computer.util.GiraphComputerHelper;
 import com.tinkerpop.gremlin.giraph.structure.GiraphGraph;
-import com.tinkerpop.gremlin.groovy.engine.function.GSSupplier;
-import com.tinkerpop.gremlin.groovy.loaders.SugarLoader;
+import com.tinkerpop.gremlin.groovy.engine.GroovyTraversalScript;
 import com.tinkerpop.gremlin.groovy.plugin.RemoteAcceptor;
 import com.tinkerpop.gremlin.process.computer.ComputerResult;
 import com.tinkerpop.gremlin.process.computer.traversal.TraversalVertexProgram;
@@ -13,7 +11,6 @@ import com.tinkerpop.gremlin.process.graph.util.DefaultGraphTraversal;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.FileConfiguration;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.codehaus.groovy.runtime.InvokerHelper;
 import org.codehaus.groovy.tools.shell.Groovysh;
 
 import java.io.File;
@@ -26,10 +23,15 @@ import java.util.List;
  */
 public class GiraphRemoteAcceptor implements RemoteAcceptor {
 
+    private static final String RESULT = "result";
+    private static final String USE_SUGAR = "useSugar";
+    private static final String SPACE = " ";
+
     private GiraphGraph giraphGraph;
     private Groovysh shell;
     private boolean useSugarPlugin = false;
     private String graphVariable = "g";
+
 
     public GiraphRemoteAcceptor(final Groovysh shell) {
         this.shell = shell;
@@ -68,7 +70,7 @@ public class GiraphRemoteAcceptor implements RemoteAcceptor {
     @Override
     public Object configure(final List<String> args) {
         for (int i = 0; i < args.size(); i = i + 2) {
-            if (args.get(i).equals("useSugar"))
+            if (args.get(i).equals(USE_SUGAR))
                 this.useSugarPlugin = Boolean.valueOf(args.get(i + 1));
             else {
                 this.giraphGraph.variables().getConfiguration().setProperty(args.get(i), args.get(i + 1));
@@ -80,27 +82,15 @@ public class GiraphRemoteAcceptor implements RemoteAcceptor {
     @Override
     public Object submit(final List<String> args) {
         try {
-            final StringBuilder builder = new StringBuilder();
-            if (this.useSugarPlugin) {
-                // builder.append(InvokerHelper.class.getCanonicalName() + ".getMetaRegistry().removeMetaClass(" + GiraphGraph.class.getCanonicalName() + ".class)\n");
-                builder.append(SugarLoader.class.getCanonicalName() + ".load()\n");
-            }
-            builder.append(this.graphVariable + " = " + GiraphGraph.class.getCanonicalName() + ".open()\n");
-            builder.append("traversal = " + args.get(0) + "\n");
-            builder.append(GiraphComputerHelper.class.getCanonicalName() + ".prepareTraversalForComputer(traversal)\n");
-            builder.append("traversal\n");
-
-            final TraversalVertexProgram vertexProgram = TraversalVertexProgram.build().traversal(new GSSupplier<>(builder.toString())).create();
-            final ComputerResult result = this.giraphGraph.compute().program(vertexProgram).submit().get();
-
-            this.shell.getInterp().getContext().setProperty("result", result);
-
-            final GraphTraversal traversal1 = new DefaultGraphTraversal<>();
-            traversal1.addStep(new ComputerResultStep<>(traversal1, result, vertexProgram, false));
-            this.shell.getInterp().getContext().setProperty("_l", traversal1);
+            final GroovyTraversalScript<?, ?> traversal = GroovyTraversalScript.of(String.join(SPACE, args)).over(this.giraphGraph).using(this.giraphGraph.compute());
+            if (this.useSugarPlugin)
+                traversal.withSugar();
+            final TraversalVertexProgram vertexProgram = traversal.program();
+            final ComputerResult computerResult = traversal.result().get();
+            this.shell.getInterp().getContext().setProperty(RESULT, computerResult);
 
             final GraphTraversal traversal2 = new DefaultGraphTraversal<>();
-            traversal2.addStep(new ComputerResultStep<>(traversal2, result, vertexProgram, false));
+            traversal2.addStep(new ComputerResultStep<>(traversal2, computerResult, vertexProgram, false));
             traversal2.range(0, 19);
             return traversal2;
         } catch (Exception e) {

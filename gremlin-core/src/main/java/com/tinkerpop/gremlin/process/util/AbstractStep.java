@@ -23,11 +23,12 @@ public abstract class AbstractStep<S, E> implements Step<S, E> {
 
     protected Step<?, S> previousStep = EmptyStep.instance();
     protected Step<E, ?> nextStep = EmptyStep.instance();
-
+    protected final static boolean PROFILING_ENABLED = "true".equals(System.getProperty(TraversalMetrics.PROFILING_ENABLED));
+    
     public AbstractStep(final Traversal traversal) {
         this.traversal = traversal;
         this.starts = new ExpandableStepIterator<S>((Step) this);
-        this.label = Graph.Key.hide(Integer.toString(this.traversal.getSteps().size()));
+        this.label = Graph.System.system(Integer.toString(this.traversal.getSteps().size()));
     }
 
     @Override
@@ -40,6 +41,11 @@ public abstract class AbstractStep<S, E> implements Step<S, E> {
     @Override
     public void addStarts(final Iterator<Traverser<S>> starts) {
         this.starts.add((Iterator) starts);
+    }
+
+    @Override
+    public void addStart(final Traverser<S> start) {
+        this.starts.add((Traverser.Admin<S>) start);
     }
 
     @Override
@@ -79,9 +85,13 @@ public abstract class AbstractStep<S, E> implements Step<S, E> {
             prepareTraversalForNextStep(this.nextEnd);
             return this.nextEnd;
         } else {
-            final Traverser<E> traverser = this.processNextStart();
-            prepareTraversalForNextStep(traverser);
-            return traverser;
+            while (true) {
+                final Traverser<E> traverser = this.processNextStart();
+                if (traverser.bulk() != 0) {
+                    prepareTraversalForNextStep(traverser);
+                    return traverser;
+                }
+            }
         }
     }
 
@@ -91,9 +101,13 @@ public abstract class AbstractStep<S, E> implements Step<S, E> {
             return true;
         else {
             try {
-                this.nextEnd = this.processNextStart();
-                this.available = true;
-                return true;
+                while (true) {
+                    this.nextEnd = this.processNextStart();
+                    if (this.nextEnd.bulk() != 0) {
+                        this.available = true;
+                        return true;
+                    }
+                }
             } catch (final NoSuchElementException e) {
                 this.available = false;
                 return false;
@@ -106,6 +120,11 @@ public abstract class AbstractStep<S, E> implements Step<S, E> {
         return this.traversal;
     }
 
+    @Override
+    public void setTraversal(final Traversal<?, ?> traversal) {
+        this.traversal = traversal;
+    }
+
     protected abstract Traverser<E> processNextStart() throws NoSuchElementException;
 
     public String toString() {
@@ -113,7 +132,7 @@ public abstract class AbstractStep<S, E> implements Step<S, E> {
     }
 
     @Override
-    public Object clone() throws CloneNotSupportedException {
+    public AbstractStep<S, E> clone() throws CloneNotSupportedException {
         final AbstractStep step = (AbstractStep) super.clone();
         step.starts = new ExpandableStepIterator<S>(step);
         step.previousStep = EmptyStep.instance();
@@ -125,9 +144,10 @@ public abstract class AbstractStep<S, E> implements Step<S, E> {
 
     private void prepareTraversalForNextStep(final Traverser<E> traverser) {
         if (!this.futureSetByChild)
-            traverser.setFuture(this.nextStep.getLabel());
-        if (traverser instanceof PathTraverser) traverser.getPath().addLabel(this.getLabel());
+            ((Traverser.Admin<E>) traverser).setFuture(this.nextStep.getLabel());
+        if (traverser instanceof PathTraverser) traverser.path().addLabel(this.getLabel());
         if (TraversalHelper.isLabeled(this.label))
             this.traversal.sideEffects().set(this.label, traverser.get());
     }
+
 }

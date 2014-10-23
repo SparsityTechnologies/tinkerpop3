@@ -64,7 +64,7 @@ public abstract class SimplePathTest extends AbstractGremlinTest {
         assertFalse(traversal.hasNext());
     }
 
-    public static class JavaSimplePathTest extends SimplePathTest {
+    public static class StandardTest extends SimplePathTest {
 
         @Override
         public Traversal<Vertex, Vertex> get_g_v1_outXcreatedX_inXcreatedX_simplePath(final Object v1Id) {
@@ -73,7 +73,7 @@ public abstract class SimplePathTest extends AbstractGremlinTest {
 
         @Override
         public Traversal<Vertex, Path> get_g_V_asXxX_both_simplePath_jumpXx_loops_lt_3X_path() {
-            return g.V().as("x").both().simplePath().jump("x", t -> t.getLoops() < 3).path();
+            return g.V().as("x").both().simplePath().jump("x", t -> t.loops() < 3).path();
         }
 
         @Override
@@ -82,7 +82,7 @@ public abstract class SimplePathTest extends AbstractGremlinTest {
         }
     }
 
-    public static class JavaComputerSimplePathTest extends SimplePathTest {
+    public static class ComputerTest extends SimplePathTest {
 
         @Override
         public Traversal<Vertex, Vertex> get_g_v1_outXcreatedX_inXcreatedX_simplePath(final Object v1Id) {
@@ -91,7 +91,7 @@ public abstract class SimplePathTest extends AbstractGremlinTest {
 
         @Override
         public Traversal<Vertex, Path> get_g_V_asXxX_both_simplePath_jumpXx_loops_lt_3X_path() {
-            return g.V().as("x").both().simplePath().jump("x", t -> t.getLoops() < 3).path().submit(g.compute());
+            return g.V().as("x").both().simplePath().jump("x", t -> t.loops() < 3).path().submit(g.compute());
         }
 
         @Override

@@ -1,7 +1,5 @@
 package com.tinkerpop.gremlin.process;
 
-import java.io.Serializable;
-
 /**
  * A {@link TraversalStrategy} defines a particular atomic operation for mutating a {@link Traversal} prior to its evaluation.
  * Traversal strategies are typically used for optimizing a traversal for the particular underlying graph engine.
@@ -10,12 +8,12 @@ import java.io.Serializable;
  *
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public interface TraversalStrategy extends Serializable, Comparable<TraversalStrategy> {
+public interface TraversalStrategy extends Comparable<TraversalStrategy> {
 
     // A TraversalStrategy should not have a public constructor
     // Make use of a singleton instance() object to reduce object creation on the JVM
 
-    public void apply(final Traversal traversal);
+    public void apply(final Traversal<?,?> traversal);
 
     public interface NoDependencies extends TraversalStrategy {
         @Override
@@ -23,5 +21,4 @@ public interface TraversalStrategy extends Serializable, Comparable<TraversalStr
             return traversalStrategy instanceof NoDependencies ? -1 : -1 * traversalStrategy.compareTo(this);
         }
     }
-
 }

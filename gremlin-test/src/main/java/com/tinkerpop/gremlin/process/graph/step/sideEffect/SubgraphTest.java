@@ -1,6 +1,5 @@
 package com.tinkerpop.gremlin.process.graph.step.sideEffect;
 
-import com.tinkerpop.gremlin.AbstractGremlinSuite;
 import com.tinkerpop.gremlin.AbstractGremlinTest;
 import com.tinkerpop.gremlin.FeatureRequirement;
 import com.tinkerpop.gremlin.LoadGraphWith;
@@ -9,6 +8,8 @@ import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Vertex;
 import org.apache.commons.configuration.Configuration;
 import org.junit.Test;
+
+import java.util.function.Supplier;
 
 import static com.tinkerpop.gremlin.LoadGraphWith.GraphData.MODERN;
 import static com.tinkerpop.gremlin.structure.Graph.Features.VertexFeatures.FEATURE_ADD_VERTICES;
@@ -34,7 +35,7 @@ public abstract class SubgraphTest extends AbstractGremlinTest {
         Traversal<Vertex, Graph> traversal = get_g_v1_outE_subgraphXknowsX_name_capXsgX(convertToVertexId("marko"), subgraph);
         printTraversalForm(traversal);
         subgraph = traversal.next();
-        AbstractGremlinSuite.assertVertexEdgeCounts(3, 2).accept(subgraph);
+        assertVertexEdgeCounts(3, 2).accept(subgraph);
         subgraph.E().forEach(e -> {
             assertEquals("knows", e.label());
             assertEquals("marko", e.outV().value("name").next());
@@ -64,21 +65,21 @@ public abstract class SubgraphTest extends AbstractGremlinTest {
         printTraversalForm(traversal);
         traversal.iterate();
 
-        AbstractGremlinSuite.assertVertexEdgeCounts(5, 4).accept(subgraph);
+        assertVertexEdgeCounts(5, 4).accept(traversal.sideEffects().get("sg"));
 
         graphProvider.clear(subgraph, config);
     }
 
-    public static class JavaSubgraphTest extends SubgraphTest {
+    public static class StandardTest extends SubgraphTest {
 
         @Override
         public Traversal<Vertex, Graph> get_g_v1_outE_subgraphXknowsX_name_capXsgX(final Object v1Id, final Graph subgraph) {
-            return g.v(v1Id).with("sg", subgraph).outE().subgraph("sg", e -> e.label().equals("knows")).value("name").cap("sg");
+            return g.v(v1Id).with("sg", () -> subgraph).outE().subgraph("sg", e -> e.label().equals("knows")).value("name").cap("sg");
         }
 
         @Override
         public Traversal<Vertex, String> get_g_V_inE_subgraphXcreatedX_name(final Graph subgraph) {
-            return g.V().with("sg", subgraph).inE().subgraph("sg", e -> e.label().equals("created")).value("name");
+            return g.V().with("sg", () -> subgraph).inE().subgraph("sg", e -> e.label().equals("created")).value("name");
         }
     }
 }

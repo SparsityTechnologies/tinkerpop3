@@ -16,7 +16,6 @@ import com.tinkerpop.gremlin.tinkergraph.process.graph.TinkerGraphTraversal;
 import com.tinkerpop.gremlin.tinkergraph.process.graph.TinkerTraversal;
 import org.apache.commons.configuration.Configuration;
 
-import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -31,8 +30,11 @@ import java.util.Set;
 @Graph.OptIn(Graph.OptIn.SUITE_STRUCTURE_PERFORMANCE)
 @Graph.OptIn(Graph.OptIn.SUITE_PROCESS_STANDARD)
 @Graph.OptIn(Graph.OptIn.SUITE_PROCESS_COMPUTER)
-public class TinkerGraph implements Graph, Serializable {
-
+@Graph.OptIn(Graph.OptIn.SUITE_GROOVY_PROCESS_STANDARD)
+@Graph.OptIn(Graph.OptIn.SUITE_GROOVY_PROCESS_COMPUTER)
+@Graph.OptIn(Graph.OptIn.SUITE_GROOVY_ENVIRONMENT)
+@Graph.OptIn(Graph.OptIn.SUITE_GROOVY_ENVIRONMENT_INTEGRATE)
+public class TinkerGraph implements Graph {
     protected Long currentId = -1l;
     protected Map<Object, Vertex> vertices = new HashMap<>();
     protected Map<Object, Edge> edges = new HashMap<>();
@@ -51,7 +53,7 @@ public class TinkerGraph implements Graph, Serializable {
 
     /**
      * Open a new {@link TinkerGraph} instance.
-     * <p>
+     * <p/>
      * <b>Reference Implementation Help:</b> If a {@link com.tinkerpop.gremlin.structure.Graph } implementation does not require a
      * {@link org.apache.commons.configuration.Configuration} (or perhaps has a default configuration) it can choose to implement a zero argument
      * open() method. This is an optional constructor method for TinkerGraph. It is not enforced by the Gremlin
@@ -63,7 +65,7 @@ public class TinkerGraph implements Graph, Serializable {
 
     /**
      * Open a new {@link TinkerGraph} instance.
-     * <p>
+     * <p/>
      * <b>Reference Implementation Help:</b> This method is the one use by the
      * {@link com.tinkerpop.gremlin.structure.util.GraphFactory} to instantiate
      * {@link com.tinkerpop.gremlin.structure.Graph} instances.  This method must be overridden for the Blueprint Test
@@ -74,11 +76,10 @@ public class TinkerGraph implements Graph, Serializable {
      * to opening graphs it will be consistent at that level.
      *
      * @param configuration the configuration for the instance
-     * @param <G>           the {@link com.tinkerpop.gremlin.structure.Graph} instance
      * @return a newly opened {@link com.tinkerpop.gremlin.structure.Graph}
      */
-    public static <G extends Graph> G open(final Configuration configuration) {
-        return (G) new TinkerGraph();
+    public static TinkerGraph open(final Configuration configuration) {
+        return new TinkerGraph();
     }
 
     ////////////// STRUCTURE API METHODS //////////////////
@@ -177,7 +178,7 @@ public class TinkerGraph implements Graph, Serializable {
 
     /**
      * Return TinkerGraph feature set.
-     * <p>
+     * <p/>
      * <b>Reference Implementation Help:</b> Implementers only need to implement features for which there are
      * negative or instance configured features.  By default, all {@link Features} return true.
      */
@@ -241,6 +242,15 @@ public class TinkerGraph implements Graph, Serializable {
 
     ///////////// GRAPH SPECIFIC INDEXING METHODS ///////////////
 
+    /**
+     * Create an index for said element class ({@link Vertex} or {@link Edge}) and said property key.
+     * Whenever an element has the specified key mutated, the index is updated.
+     * When the index is created, all existing elements are indexed to ensure that they are captured by the index.
+     *
+     * @param key          the property key to index
+     * @param elementClass the element class to index
+     * @param <E>          The type of the element class
+     */
     public <E extends Element> void createIndex(final String key, final Class<E> elementClass) {
         if (Vertex.class.isAssignableFrom(elementClass)) {
             this.vertexIndex.createKeyIndex(key);
@@ -251,6 +261,13 @@ public class TinkerGraph implements Graph, Serializable {
         }
     }
 
+    /**
+     * Drop the index for the specified element class ({@link Vertex} or {@link Edge}) and key.
+     *
+     * @param key          the property key to stop indexing
+     * @param elementClass the element class of the index to drop
+     * @param <E>          The type of the element class
+     */
     public <E extends Element> void dropIndex(final String key, final Class<E> elementClass) {
         if (Vertex.class.isAssignableFrom(elementClass)) {
             this.vertexIndex.dropKeyIndex(key);
@@ -261,6 +278,13 @@ public class TinkerGraph implements Graph, Serializable {
         }
     }
 
+    /**
+     * Return all the keys currently being index for said element class  ({@link Vertex} or {@link Edge}).
+     *
+     * @param elementClass the element class to get the indexed keys for
+     * @param <E>          The type of the element class
+     * @return the set of keys currently being indexed
+     */
     public <E extends Element> Set<String> getIndexedKeys(final Class<E> elementClass) {
         if (Vertex.class.isAssignableFrom(elementClass)) {
             return this.vertexIndex.getIndexedKeys();
@@ -269,5 +293,12 @@ public class TinkerGraph implements Graph, Serializable {
         } else {
             throw new IllegalArgumentException("Class is not indexable: " + elementClass);
         }
+    }
+
+    /**
+     * {@link TinkerGraphComputer} generates a view of the original graph. When the view is no longer needed, it can be dropped.
+     */
+    public void dropGraphView() {
+        this.graphView = null;
     }
 }

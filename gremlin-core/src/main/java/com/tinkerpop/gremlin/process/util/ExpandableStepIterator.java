@@ -3,84 +3,58 @@ package com.tinkerpop.gremlin.process.util;
 import com.tinkerpop.gremlin.process.Step;
 import com.tinkerpop.gremlin.process.Traverser;
 
-import java.io.Serializable;
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.Queue;
 
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class ExpandableStepIterator<E> implements Iterator<Traverser<E>>, Serializable {
+public class ExpandableStepIterator<E> implements Iterator<Traverser.Admin<E>> {
 
-    private final ExpandableIterator<Traverser<E>> expander = new ExpandableIterator<>();
-    private Step<?, E> hostStep = EmptyStep.instance();
+    private final TraverserSet<E> traverserSet = new TraverserSet<>();
+    private final MultiIterator<Traverser.Admin<E>> traverserIterators = new MultiIterator<>();
+    private final Step<?, E> hostStep;
 
     public ExpandableStepIterator(final Step<?, E> hostStep) {
         this.hostStep = hostStep;
     }
 
-    public void clear() {
-        this.expander.clear();
-    }
-
     @Override
     public boolean hasNext() {
-        return this.hostStep.getPreviousStep().hasNext() || this.expander.hasNext();
+        return !this.traverserSet.isEmpty() || this.hostStep.getPreviousStep().hasNext();
     }
 
     @Override
-    public Traverser<E> next() {
+    public Traverser.Admin<E> next() {
+        if (!this.traverserSet.isEmpty())
+            return this.traverserSet.remove();
+        if (this.traverserIterators.hasNext())
+            return this.traverserIterators.next();
+
         if (this.hostStep.getPreviousStep().hasNext())
-            return (Traverser<E>) this.hostStep.getPreviousStep().next();
-        else
-            return this.expander.next();
+            return (Traverser.Admin<E>) this.hostStep.getPreviousStep().next();
+
+        if (this.traverserIterators.hasNext())
+            return this.traverserIterators.next();
+
+        return this.traverserSet.remove();
+
     }
 
-    public void add(final Iterator<E> iterator) {
-        this.expander.add((Iterator) iterator);
+    public void add(final Iterator<Traverser.Admin<E>> iterator) {
+        this.traverserIterators.addIterator(iterator);
     }
 
+    public void add(final Traverser.Admin<E> traverser) {
+        this.traverserSet.add(traverser);
+    }
+
+    @Override
     public String toString() {
-        return this.expander.toString();
+        return this.traverserSet.toString();
     }
 
-    public boolean isEmpty() {
-        return this.expander.queue.isEmpty();
-    }
-
-    public class ExpandableIterator<T> implements Iterator<T>, Serializable {
-
-        private final Queue<Iterator<T>> queue = new LinkedList<>();
-
-        public void clear() {
-            this.queue.clear();
-        }
-
-        @Override
-        public boolean hasNext() {
-            for (final Iterator<T> itty : this.queue) {
-                if (itty.hasNext())
-                    return true;
-            }
-            return false;
-        }
-
-        @Override
-        public T next() {
-            while (true) {
-                final Iterator<T> itty = this.queue.element();
-                if (null != itty && itty.hasNext()) return itty.next();
-                else this.queue.remove();
-            }
-        }
-
-        public void add(final Iterator<T> iterator) {
-            this.queue.add(iterator);
-        }
-
-        public String toString() {
-            return this.queue.toString();
-        }
+    public void clear() {
+        this.traverserIterators.clear();
+        this.traverserSet.clear();
     }
 }

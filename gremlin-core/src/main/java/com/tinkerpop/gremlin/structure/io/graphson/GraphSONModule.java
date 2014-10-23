@@ -8,11 +8,15 @@ import com.fasterxml.jackson.databind.ser.std.StdKeySerializer;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Element;
+import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.VertexProperty;
+import com.tinkerpop.gremlin.util.StreamFactory;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * @author Stephen Mallette (http://stephen.genoprime.com)
@@ -25,6 +29,55 @@ public class GraphSONModule extends SimpleModule {
         addSerializer(Vertex.class, new VertexJacksonSerializer());
         addSerializer(GraphSONVertex.class, new GraphSONVertex.VertexJacksonSerializer());
         addSerializer(GraphSONGraph.class, new GraphSONGraph.GraphJacksonSerializer(normalize));
+        addSerializer(VertexProperty.class, new VertexPropertyJacksonSerializer());
+    }
+
+    static class VertexPropertyJacksonSerializer extends StdSerializer<VertexProperty> {
+        public VertexPropertyJacksonSerializer() {
+            super(VertexProperty.class);
+        }
+
+        @Override
+        public void serialize(final VertexProperty property, final JsonGenerator jsonGenerator, final SerializerProvider serializerProvider)
+                throws IOException {
+            ser(property, jsonGenerator);
+        }
+
+        @Override
+        public void serializeWithType(final VertexProperty property, final JsonGenerator jsonGenerator,
+                                      final SerializerProvider serializerProvider, final TypeSerializer typeSerializer) throws IOException {
+            ser(property, jsonGenerator);
+        }
+
+        private void ser(final VertexProperty property, final JsonGenerator jsonGenerator) throws IOException {
+            final Map<String, Object> m = new HashMap<>();
+            m.put(GraphSONTokens.ID, property.id());
+            m.put(GraphSONTokens.LABEL, property.label());
+            m.put(GraphSONTokens.VALUE, property.value());
+
+            Map<String,Object> properties;
+            try {
+                properties = StreamFactory.<Property<Object>>stream(property.iterators().propertyIterator()).collect(Collectors.toMap(Property::key, Property::value));
+            } catch (UnsupportedOperationException uoe) {
+                // throws if meta-properties are no supported - no way at this time to check the feature
+                // directly as Graph is not available here.
+                properties = new HashMap<>();
+            }
+
+            Map<String,Object> hiddens;
+            try {
+                hiddens = StreamFactory.<Property<Object>>stream(property.iterators().hiddenPropertyIterator()).collect(Collectors.toMap(Property::key, Property::value));
+            } catch (UnsupportedOperationException uoe) {
+                // throws if meta-properties are no supported - no way at this time to check the feature
+                // directly as Graph is not available here.
+                hiddens = new HashMap<>();
+            }
+
+            m.put(GraphSONTokens.PROPERTIES, properties);
+            m.put(GraphSONTokens.HIDDENS, hiddens);
+
+            jsonGenerator.writeObject(m);
+        }
     }
 
     static class EdgeJacksonSerializer extends StdSerializer<Edge> {
@@ -57,8 +110,8 @@ public class GraphSONModule extends SimpleModule {
             final Vertex outV = edge.outV().next();
             m.put(GraphSONTokens.OUT, outV.id());
             m.put(GraphSONTokens.OUT_LABEL, outV.label());
-            m.put(GraphSONTokens.PROPERTIES, edge.values());
-            m.put(GraphSONTokens.HIDDENS, edge.hiddenValues());
+            m.put(GraphSONTokens.PROPERTIES, edge.valueMap().next());
+            m.put(GraphSONTokens.HIDDENS, edge.hiddenValueMap().next());
 
             jsonGenerator.writeObject(m);
         }
@@ -89,8 +142,8 @@ public class GraphSONModule extends SimpleModule {
             m.put(GraphSONTokens.ID, vertex.id());
             m.put(GraphSONTokens.LABEL, vertex.label());
             m.put(GraphSONTokens.TYPE, GraphSONTokens.VERTEX);
-            m.put(GraphSONTokens.PROPERTIES, vertex.values());
-            m.put(GraphSONTokens.HIDDENS, vertex.hiddenValues());
+            m.put(GraphSONTokens.PROPERTIES, vertex.propertyMap().next());
+            m.put(GraphSONTokens.HIDDENS, vertex.hiddenMap().next());
 
             jsonGenerator.writeObject(m);
         }
@@ -120,79 +173,4 @@ public class GraphSONModule extends SimpleModule {
                 super.serialize(o, jsonGenerator, serializerProvider);
         }
     }
-
-    /*
-    static class EdgeJacksonDeserializer extends StdDeserializer<CachedEdge> {
-
-        public EdgeJacksonDeserializer() {
-            super(CachedEdge.class);
-        }
-
-        @Override
-        public CachedEdge deserialize(final JsonParser jsonParser, final DeserializationContext deserializationContext) throws IOException, JsonProcessingException {
-            final ObjectCodec oc = jsonParser.getCodec();
-
-            Object id = null;
-            String label = null;
-            Map properties = null;
-            String inLabel = null;
-            String outLabel = null;
-            Object in = null;
-            Object out = null;
-            while (!jsonParser.nextToken().equals(JsonToken.END_OBJECT)) {
-                final String name = jsonParser.getCurrentName();
-                if (name != null && name.equals(GraphSONTokens.ID))
-                    id = oc.readValue(jsonParser, Object.class);
-                else if (name != null && name.equals(GraphSONTokens.LABEL))
-                    label = jsonParser.getValueAsString();
-                else if (name != null && name.equals(GraphSONTokens.PROPERTIES)) {
-                    jsonParser.nextToken();
-                    properties = (Map) oc.readValue(jsonParser, Object.class);
-                } else if (name != null && name.equals(GraphSONTokens.IN)) {
-                    jsonParser.nextToken();
-                    in = oc.readValue(jsonParser, Object.class);
-                } else if (name != null && name.equals(GraphSONTokens.OUT)) {
-                    jsonParser.nextToken();
-                    out = oc.readValue(jsonParser, Object.class);
-                } else if (name != null && name.equals(GraphSONTokens.IN_LABEL))
-                    inLabel = jsonParser.getValueAsString();
-                else if (name != null && name.equals(GraphSONTokens.OUT_LABEL))
-                    outLabel = jsonParser.getValueAsString();
-            }
-
-            return new CachedEdge(id, label, properties,
-                    Pair.with(out, outLabel), Pair.with(in, inLabel));
-
-        }
-    }
-
-    static class VertexJacksonDeserializer extends StdDeserializer<CachedVertex> {
-
-        public VertexJacksonDeserializer() {
-            super(CachedVertex.class);
-        }
-
-        @Override
-        public CachedVertex deserialize(final JsonParser jsonParser, final DeserializationContext deserializationContext) throws IOException, JsonProcessingException {
-            final ObjectCodec oc = jsonParser.getCodec();
-
-            Object id = null;
-            String label = null;
-            Map properties = null;
-            while (!jsonParser.nextToken().equals(JsonToken.END_OBJECT)) {
-                final String name = jsonParser.getCurrentName();
-                if (name != null && name.equals(GraphSONTokens.ID))
-                    id = oc.readValue(jsonParser, Object.class);
-                else if (name != null && name.equals(GraphSONTokens.LABEL))
-                    label = jsonParser.getValueAsString();
-                else if (name != null && name.equals(GraphSONTokens.PROPERTIES)) {
-                    jsonParser.nextToken();
-                    properties = (Map) oc.readValue(jsonParser, Object.class);
-                }
-            }
-
-            return new CachedVertex(id, label, properties);
-        }
-    }
-     */
 }

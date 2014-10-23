@@ -1,9 +1,9 @@
 package com.tinkerpop.gremlin.process.computer.clustering.peerpressure;
 
 import com.tinkerpop.gremlin.process.computer.MapReduce;
-import com.tinkerpop.gremlin.process.computer.clustering.peerpressure.PeerPressureVertexProgram;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.util.StringFactory;
 import org.apache.commons.configuration.Configuration;
 import org.javatuples.Pair;
 
@@ -17,7 +17,7 @@ import java.util.Set;
  */
 public class ClusterCountMapReduce implements MapReduce<MapReduce.NullObject, Serializable, MapReduce.NullObject, Integer, Integer> {
 
-    public static final String CLUSTER_COUNT_SIDE_EFFECT_KEY = "gremlin.clusterCount.sideEffectKey";
+    public static final String CLUSTER_COUNT_SIDE_EFFECT_KEY = "gremlin.clusterCountMapReduce.sideEffectKey";
     public static final String DEFAULT_SIDE_EFFECT_KEY = "clusterCount";
 
     private String sideEffectKey = DEFAULT_SIDE_EFFECT_KEY;
@@ -68,12 +68,17 @@ public class ClusterCountMapReduce implements MapReduce<MapReduce.NullObject, Se
     }
 
     @Override
-    public Integer generateSideEffect(final Iterator<Pair<NullObject, Integer>> keyValues) {
+    public Integer generateFinalResult(final Iterator<Pair<NullObject, Integer>> keyValues) {
         return keyValues.next().getValue1();
     }
 
     @Override
-    public String getSideEffectKey() {
+    public String getMemoryKey() {
         return this.sideEffectKey;
+    }
+
+    @Override
+    public String toString() {
+        return StringFactory.mapReduceString(this, this.sideEffectKey);
     }
 }

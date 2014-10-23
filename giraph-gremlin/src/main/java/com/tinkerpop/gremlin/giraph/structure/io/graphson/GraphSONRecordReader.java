@@ -3,13 +3,12 @@ package com.tinkerpop.gremlin.giraph.structure.io.graphson;
 import com.tinkerpop.gremlin.giraph.structure.util.GiraphInternalVertex;
 import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
-import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Vertex;
 import com.tinkerpop.gremlin.structure.io.graphson.GraphSONReader;
+import com.tinkerpop.gremlin.structure.util.detached.DetachedEdge;
+import com.tinkerpop.gremlin.structure.util.detached.DetachedVertex;
 import com.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph;
 import com.tinkerpop.gremlin.tinkergraph.structure.TinkerVertex;
-import com.tinkerpop.gremlin.util.function.SQuintFunction;
-import com.tinkerpop.gremlin.util.function.STriFunction;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.RecordReader;
@@ -19,10 +18,11 @@ import org.apache.hadoop.mapreduce.lib.input.LineRecordReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.NoSuchElementException;
+import java.util.function.Function;
 
 /**
  * @author Joshua Shinavier (http://fortytwo.net)
+ * @author Stephen Mallette (http://stephen.genoprime.com)
  */
 public class GraphSONRecordReader extends RecordReader<NullWritable, GiraphInternalVertex> {
 
@@ -37,7 +37,6 @@ public class GraphSONRecordReader extends RecordReader<NullWritable, GiraphInter
 
     @Override
     public void initialize(final InputSplit genericSplit, final TaskAttemptContext context) throws IOException {
-        //System.out.println("split: " + genericSplit);
         this.lineRecordReader.initialize(genericSplit, context);
     }
 
@@ -48,8 +47,8 @@ public class GraphSONRecordReader extends RecordReader<NullWritable, GiraphInter
 
         final TinkerGraph g = TinkerGraph.open();
 
-        final STriFunction<Object, String, Object[], Vertex> vertexMaker = (id, label, props) -> createVertex(g, id, label, props);
-        final SQuintFunction<Object, Object, Object, String, Object[], Edge> edgeMaker = (id, outId, inId, label, props) -> createEdge(g, id, outId, inId, label, props);
+        final Function<DetachedVertex, Vertex> vertexMaker = detachedVertex -> DetachedVertex.addTo(g, detachedVertex);
+        final Function<DetachedEdge, Edge> edgeMaker = detachedEdge -> DetachedEdge.addTo(g, detachedEdge);
 
         final TinkerVertex v;
         try (InputStream in = new ByteArrayInputStream(this.lineRecordReader.getCurrentValue().getBytes())) {
@@ -58,55 +57,6 @@ public class GraphSONRecordReader extends RecordReader<NullWritable, GiraphInter
 
         this.vertex = new GiraphInternalVertex(v);
         return true;
-    }
-
-    private Vertex createVertex(final TinkerGraph g,
-                                final Object id,
-                                final String label,
-                                final Object[] props) {
-
-        Object[] newProps = new Object[props.length + 4];
-        System.arraycopy(props, 0, newProps, 0, props.length);
-        newProps[props.length] = Element.ID;
-        newProps[props.length + 1] = id;
-        newProps[props.length + 2] = Element.LABEL;
-        newProps[props.length + 3] = label;
-
-        return g.addVertex(newProps);
-    }
-
-    private Edge createEdge(final TinkerGraph g,
-                            final Object id,
-                            final Object outId,
-                            final Object inId,
-                            final String label,
-                            final Object[] props) {
-        Vertex outV;
-        try {
-            outV = g.v(outId);
-        } catch (final NoSuchElementException e) {
-            outV = null;
-        }
-        if (null == outV) {
-            outV = g.addVertex(Element.ID, outId);
-        }
-
-        Vertex inV;
-        try {
-            inV = g.v(inId);
-        } catch (final NoSuchElementException e) {
-            inV = null;
-        }
-        if (null == inV) {
-            inV = g.addVertex(Element.ID, inId);
-        }
-
-        Object[] newProps = new Object[props.length + 2];
-        System.arraycopy(props, 0, newProps, 0, props.length);
-        newProps[props.length] = Element.ID;
-        newProps[props.length + 1] = id;
-
-        return outV.addEdge(label, inV, newProps);
     }
 
     @Override

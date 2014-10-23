@@ -20,7 +20,7 @@ import java.util.Set;
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class GiraphMemory extends MasterCompute implements Memory {
+public final class GiraphMemory extends MasterCompute implements Memory {
 
     private VertexProgram vertexProgram;
     private GiraphInternalVertex giraphInternalVertex;
@@ -55,9 +55,9 @@ public class GiraphMemory extends MasterCompute implements Memory {
                     this.registerPersistentAggregator(key, MemoryAggregator.class);
                 }
                 this.registerPersistentAggregator(Constants.GREMLIN_HALT, MemoryAggregator.class);
-                this.registerPersistentAggregator(Constants.RUNTIME, MemoryAggregator.class);
+                this.registerPersistentAggregator(Constants.SYSTEM_RUNTIME, MemoryAggregator.class);
                 this.setAggregatedValue(Constants.GREMLIN_HALT, new RuleWritable(RuleWritable.Rule.SET, false));
-                this.set(Constants.RUNTIME, System.currentTimeMillis());
+                this.set(Constants.SYSTEM_RUNTIME, System.currentTimeMillis());
             } catch (final Exception e) {
                 throw new IllegalStateException(e.getMessage(), e);
             }
@@ -86,7 +86,7 @@ public class GiraphMemory extends MasterCompute implements Memory {
 
     @Override
     public long getRuntime() {
-        return System.currentTimeMillis() - this.<Long>get(Constants.RUNTIME);
+        return System.currentTimeMillis() - this.<Long>get(Constants.SYSTEM_RUNTIME);
     }
 
     @Override
@@ -176,13 +176,14 @@ public class GiraphMemory extends MasterCompute implements Memory {
         // is this true?
     }
 
+    @Override
     public String toString() {
-        return StringFactory.computeMemoryString(this);
+        return StringFactory.memoryString(this);
     }
 
     private void checkKeyValue(final String key, final Object value) {
-        if (!key.equals(Constants.RUNTIME) && !this.memoryKeys.contains(key))
-            throw GraphComputer.Exceptions.providedKeyIsNotAMemoryKey(key);
+        if (!key.equals(Constants.SYSTEM_RUNTIME) && !this.memoryKeys.contains(key))
+            throw GraphComputer.Exceptions.providedKeyIsNotAMemoryComputeKey(key);
         MemoryHelper.validateValue(value);
     }
 }

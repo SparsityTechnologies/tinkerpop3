@@ -50,7 +50,18 @@
                     <groupId>jline</groupId>
                     <artifactId>jline</artifactId>
                 </exclusion>
+                <!-- gremlin-test conflicts -->
+                <exclusion>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                </exclusion>
             </exclusions>
+        </dependency>
+        <!-- excluded guava from giraph because of gremlin-test conflicts - add back the version required by gremlin-test -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>15.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
@@ -65,6 +76,12 @@
         <dependency>
             <groupId>com.tinkerpop</groupId>
             <artifactId>gremlin-test</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.tinkerpop</groupId>
+            <artifactId>gremlin-groovy-test</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
@@ -119,22 +136,26 @@
                 <artifactId>maven-failsafe-plugin</artifactId>
             </plugin>
             <plugin>
-                <groupId>org.codehaus.gmaven</groupId>
-                <artifactId>gmaven-plugin</artifactId>
-                <version>1.5</version>
+                <groupId>org.codehaus.gmavenplus</groupId>
+                <artifactId>gmavenplus-plugin</artifactId>
+                <version>1.2</version>
                 <executions>
                     <execution>
                         <goals>
+                            <goal>addSources</goal>
+                            <goal>addTestSources</goal>
                             <goal>generateStubs</goal>
                             <goal>compile</goal>
-                            <goal>generateTestStubs</goal>
+                            <goal>testGenerateStubs</goal>
                             <goal>testCompile</goal>
+                            <goal>removeStubs</goal>
+                            <goal>removeTestStubs</goal>
                         </goals>
-                        <configuration>
-                            <providerSelection>2.0</providerSelection>
-                        </configuration>
                     </execution>
                 </executions>
+                <configuration>
+                    <invokeDynamic>true</invokeDynamic>
+                </configuration>
             </plugin>
         </plugins>
     </build>

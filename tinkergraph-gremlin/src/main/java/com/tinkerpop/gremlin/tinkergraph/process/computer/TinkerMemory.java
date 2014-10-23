@@ -8,7 +8,6 @@ import com.tinkerpop.gremlin.process.computer.util.MemoryHelper;
 import com.tinkerpop.gremlin.structure.util.StringFactory;
 
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,7 +18,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
 // TODO: add TinkerASPMemory
-public class TinkerMemory implements Memory.Administrative {
+public class TinkerMemory implements Memory.Admin {
 
     public final Set<String> memoryKeys = new HashSet<>();
     public Map<String, Object> previousMap;
@@ -28,17 +27,17 @@ public class TinkerMemory implements Memory.Administrative {
     private final AtomicLong runtime = new AtomicLong(0l);
     private boolean complete = false;
 
-    public TinkerMemory(final VertexProgram vertexProgram, final List<MapReduce> mapReducers) {
+    public TinkerMemory(final VertexProgram<?> vertexProgram, final Set<MapReduce> mapReducers) {
         this.currentMap = new ConcurrentHashMap<>();
         this.previousMap = new ConcurrentHashMap<>();
         if (null != vertexProgram) {
-            for (final String key : (Set<String>) vertexProgram.getMemoryComputeKeys()) {
+            for (final String key : vertexProgram.getMemoryComputeKeys()) {
                 MemoryHelper.validateKey(key);
                 this.memoryKeys.add(key);
             }
         }
         for (final MapReduce mapReduce : mapReducers) {
-            this.memoryKeys.add(mapReduce.getSideEffectKey());
+            this.memoryKeys.add(mapReduce.getMemoryKey());
         }
     }
 
@@ -129,14 +128,15 @@ public class TinkerMemory implements Memory.Administrative {
         this.currentMap.put(key, value);
     }
 
+    @Override
     public String toString() {
-        return StringFactory.computeMemoryString(this);
+        return StringFactory.memoryString(this);
     }
 
     private void checkKeyValue(final String key, final Object value) {
         if (this.complete) throw Memory.Exceptions.memoryCompleteAndImmutable();
         if (!this.memoryKeys.contains(key))
-            throw GraphComputer.Exceptions.providedKeyIsNotAMemoryKey(key);
+            throw GraphComputer.Exceptions.providedKeyIsNotAMemoryComputeKey(key);
         MemoryHelper.validateValue(value);
     }
 }

@@ -11,16 +11,24 @@ import com.tinkerpop.gremlin.process.Path;
 import com.tinkerpop.gremlin.process.PathTraverser;
 import com.tinkerpop.gremlin.process.SimpleTraverser;
 import com.tinkerpop.gremlin.process.T;
-import com.tinkerpop.gremlin.process.computer.traversal.TraverserCountTracker;
-import com.tinkerpop.gremlin.process.computer.traversal.TraverserPathTracker;
+import com.tinkerpop.gremlin.process.computer.traversal.TraverserTracker;
 import com.tinkerpop.gremlin.process.graph.util.Tree;
+import com.tinkerpop.gremlin.process.util.BulkSet;
+import com.tinkerpop.gremlin.process.util.StepTimer;
+import com.tinkerpop.gremlin.process.util.TraversalMetrics;
+import com.tinkerpop.gremlin.process.util.TraverserSet;
 import com.tinkerpop.gremlin.structure.Contains;
 import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
+import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
-import com.tinkerpop.gremlin.structure.io.util.IoEdge;
-import com.tinkerpop.gremlin.structure.io.util.IoVertex;
+import com.tinkerpop.gremlin.structure.VertexProperty;
+import com.tinkerpop.gremlin.structure.util.detached.DetachedEdge;
 import com.tinkerpop.gremlin.structure.util.detached.DetachedPath;
+import com.tinkerpop.gremlin.structure.util.detached.DetachedProperty;
+import com.tinkerpop.gremlin.structure.util.detached.DetachedVertex;
+import com.tinkerpop.gremlin.structure.util.detached.DetachedVertexProperty;
+import com.tinkerpop.gremlin.structure.util.referenced.ReferencedPath;
 import org.javatuples.Pair;
 import org.javatuples.Triplet;
 
@@ -38,6 +46,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -47,7 +56,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -127,20 +135,20 @@ public final class GremlinKryo {
 
         /**
          * If using custom classes it might be useful to tag the version stamped to the serialization with a custom
-         * value, such that Kryo serialization at 1.0.0 would have a fourth byte for an extended version.  The
-         * user supplied fourth byte can then be used to ensure the right deserializer is used to read the data.
-         * If this value is not supplied then it is written as {@link Byte#MIN_VALUE}. The value supplied here
-         * should be greater than or equal to zero.
+         * value, such that Kryo serialization at 1.0.0 would have a fourth byte for an extended version.  The user
+         * supplied fourth byte can then be used to ensure the right deserializer is used to read the data. If this
+         * value is not supplied then it is written as {@link Byte#MIN_VALUE}. The value supplied here should be greater
+         * than or equal to zero.
          */
         public Builder extendedVersion(final byte extendedVersion);
 
         /**
-         * By default the {@link #extendedVersion(byte)} is checked against what is read from an input source and
-         * if those values are equal the version being read is considered "compliant".  To alter this behavior,
-         * supply a custom compliance {@link Predicate} to evaluate the value read from the input source (i.e. first
-         * argument) and the value marked in the {@code GremlinKryo} instance {i.e. second argument}.  Supplying
-         * this function is useful when versions require backward compatibility or other more complex checks.  This
-         * function is only used if the {@link #extendedVersion(byte)} is set to something other than its default.
+         * By default the {@link #extendedVersion(byte)} is checked against what is read from an input source and if
+         * those values are equal the version being read is considered "compliant".  To alter this behavior, supply a
+         * custom compliance {@link Predicate} to evaluate the value read from the input source (i.e. first argument)
+         * and the value marked in the {@code GremlinKryo} instance {i.e. second argument}.  Supplying this function is
+         * useful when versions require backward compatibility or other more complex checks.  This function is only used
+         * if the {@link #extendedVersion(byte)} is set to something other than its default.
          */
         public Builder compliant(final BiPredicate<Byte, Byte> compliant);
 
@@ -174,11 +182,11 @@ public final class GremlinKryo {
             put("junk", "dummy");
         }};
 
-        private static final Class linkedHashMapEntryClass = m.entrySet().iterator().next().getClass();
+        private static final Class LINKED_HASH_MAP_ENTRY_CLASS = m.entrySet().iterator().next().getClass();
 
         /**
          * Note that the following are pre-registered boolean, Boolean, byte, Byte, char, Character, double, Double,
-         * int, Integer, float, Float, long, Long, short, Short, String, void. Current max is HashSet=64.
+         * int, Integer, float, Float, long, Long, short, Short, String, void.
          */
         private final List<Triplet<Class, Serializer, Integer>> serializationList = new ArrayList<Triplet<Class, Serializer, Integer>>() {{
             add(Triplet.<Class, Serializer, Integer>with(byte[].class, null, 25));
@@ -206,16 +214,17 @@ public final class GremlinKryo {
             add(Triplet.<Class, Serializer, Integer>with(Currency.class, null, 40));
             add(Triplet.<Class, Serializer, Integer>with(Date.class, null, 38));
             add(Triplet.<Class, Serializer, Integer>with(Direction.class, null, 12));
-            add(Triplet.<Class, Serializer, Integer>with(Edge.class, new ElementSerializer.EdgeSerializer(), 19));
+            add(Triplet.<Class, Serializer, Integer>with(DetachedEdge.class, null, 21));
+            add(Triplet.<Class, Serializer, Integer>with(DetachedVertexProperty.class, null, 20));
+            add(Triplet.<Class, Serializer, Integer>with(DetachedProperty.class, null, 18));
+            add(Triplet.<Class, Serializer, Integer>with(DetachedVertex.class, null, 19));
             add(Triplet.<Class, Serializer, Integer>with(EdgeTerminator.class, null, 14));
             add(Triplet.<Class, Serializer, Integer>with(EnumSet.class, null, 46));
             add(Triplet.<Class, Serializer, Integer>with(HashMap.class, null, 11));
             add(Triplet.<Class, Serializer, Integer>with(HashMap.Entry.class, null, 16));
-            add(Triplet.<Class, Serializer, Integer>with(IoEdge.class, null, 21));
-            add(Triplet.<Class, Serializer, Integer>with(IoVertex.class, null, 20));
             add(Triplet.<Class, Serializer, Integer>with(KryoSerializable.class, null, 36));
             add(Triplet.<Class, Serializer, Integer>with(LinkedHashMap.class, null, 47));
-            add(Triplet.<Class, Serializer, Integer>with(linkedHashMapEntryClass, null, 15));
+            add(Triplet.<Class, Serializer, Integer>with(LINKED_HASH_MAP_ENTRY_CLASS, null, 15));
             add(Triplet.<Class, Serializer, Integer>with(Locale.class, null, 22));
             add(Triplet.<Class, Serializer, Integer>with(StringBuffer.class, null, 43));
             add(Triplet.<Class, Serializer, Integer>with(StringBuilder.class, null, 44));
@@ -224,20 +233,26 @@ public final class GremlinKryo {
             add(Triplet.<Class, Serializer, Integer>with(TreeMap.class, null, 45));
             add(Triplet.<Class, Serializer, Integer>with(TreeSet.class, null, 50));
             add(Triplet.<Class, Serializer, Integer>with(UUID.class, new UUIDSerializer(), 17));
-            add(Triplet.<Class, Serializer, Integer>with(Vertex.class, new ElementSerializer.VertexSerializer(), 18));
             add(Triplet.<Class, Serializer, Integer>with(VertexTerminator.class, null, 13));
 
-            // recently added for GraphTraversal in OLAP
+            add(Triplet.<Class, Serializer, Integer>with(Edge.class, new ElementSerializer.EdgeSerializer(), 65));
+            add(Triplet.<Class, Serializer, Integer>with(Vertex.class, new ElementSerializer.VertexSerializer(), 66));
+            add(Triplet.<Class, Serializer, Integer>with(Property.class, new ElementSerializer.PropertySerializer(), 67));
+            add(Triplet.<Class, Serializer, Integer>with(VertexProperty.class, new ElementSerializer.VertexPropertySerializer(), 68));
+
             add(Triplet.<Class, Serializer, Integer>with(SimpleTraverser.class, null, 55));
             add(Triplet.<Class, Serializer, Integer>with(PathTraverser.class, null, 56));
-            add(Triplet.<Class, Serializer, Integer>with(TraverserCountTracker.class, null, 57));
-            add(Triplet.<Class, Serializer, Integer>with(TraverserPathTracker.class, null, 58));
+            add(Triplet.<Class, Serializer, Integer>with(TraverserTracker.class, null, 57));
+            add(Triplet.<Class, Serializer, Integer>with(TraverserSet.class, null, 58));
             add(Triplet.<Class, Serializer, Integer>with(Path.class, null, 59));
-            add(Triplet.<Class, Serializer, Integer>with(DetachedPath.class, null, 60)); // is this needed?
-            add(Triplet.<Class, Serializer, Integer>with(Optional.class, null, 61));
-            add(Triplet.<Class, Serializer, Integer>with(AtomicLong.class, null, 62)); // this is all needed for serializing properties in TinkerGraph
-            add(Triplet.<Class, Serializer, Integer>with(Tree.class, null, 63));
-            add(Triplet.with(HashSet.class, null, 64));
+            add(Triplet.<Class, Serializer, Integer>with(DetachedPath.class, null, 60));
+            add(Triplet.<Class, Serializer, Integer>with(Tree.class, null, 61));
+            add(Triplet.<Class, Serializer, Integer>with(HashSet.class, null, 62));
+            add(Triplet.<Class, Serializer, Integer>with(ReferencedPath.class, null, 63));
+            add(Triplet.<Class, Serializer, Integer>with(BulkSet.class, null, 64));
+            add(Triplet.<Class, Serializer, Integer>with(StepTimer.class, null, 69));
+            add(Triplet.<Class, Serializer, Integer>with(TraversalMetrics.class, null, 70));
+            add(Triplet.<Class, Serializer, Integer>with(LinkedHashSet.class, null, 71));  // ***LAST ID***
         }};
 
         private static final byte major = 1;

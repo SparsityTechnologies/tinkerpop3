@@ -5,29 +5,25 @@ import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.VertexProperty;
 import com.tinkerpop.gremlin.structure.util.ElementHelper;
 import com.tinkerpop.gremlin.structure.util.StringFactory;
-import com.tinkerpop.gremlin.util.StreamFactory;
 
 import java.io.Serializable;
-import java.util.Iterator;
-import java.util.Optional;
 
 /**
  * @author Stephen Mallette (http://stephen.genoprime.com)
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class DetachedProperty<V> implements Property, Serializable {
+public class DetachedProperty<V> implements Property, Serializable, Attachable<Property<V>> {
 
     String key;
     V value;
-    DetachedElement element;
-    int hashCode;
+    transient DetachedElement element;
 
-    private DetachedProperty() {
-
-    }
-
+    /**
+     * Construct a {@code DetachedProperty} during manual deserialization.
+     */
     public DetachedProperty(final String key, final V value, final DetachedElement element) {
         if (null == key) throw Graph.Exceptions.argumentCanNotBeNull("key");
         if (null == value) throw Graph.Exceptions.argumentCanNotBeNull("value");
@@ -36,19 +32,48 @@ public class DetachedProperty<V> implements Property, Serializable {
         this.key = key;
         this.value = value;
         this.element = element;
-        this.hashCode = super.hashCode();
+    }
+
+    /**
+     * Construct a {@code DetachedProperty} internally when a {@link DetachedEdge} is being constructed.
+     */
+    DetachedProperty(final Property property, final DetachedEdge element) {
+        this(property, (DetachedElement) element);
+    }
+
+    /**
+     * Construct a {@code DetachedProperty} internally when a {@link DetachedVertexProperty} is being constructed.
+     */
+    DetachedProperty(final Property property, final DetachedVertexProperty element) {
+        this(property, (DetachedElement) element);
+    }
+
+    private DetachedProperty(final Property property, final DetachedElement element) {
+        if (null == property) throw Graph.Exceptions.argumentCanNotBeNull("property");
+        if (element instanceof Vertex) throw new IllegalArgumentException("Element cannot be of type " + Vertex.class.getSimpleName());
+
+        this.key = property.isHidden() ? Graph.Key.hide(property.key()) : property.key();
+        this.value = (V) property.value();
+        this.element = element;
+    }
+
+    private DetachedProperty() {
+        // no implementation
     }
 
     private DetachedProperty(final Property property) {
         if (null == property) throw Graph.Exceptions.argumentCanNotBeNull("property");
 
-        this.key = property.key();
+        this.key = property.isHidden() ? Graph.Key.hide(property.key()) : property.key();
         this.value = (V) property.value();
-        this.hashCode = property.hashCode();
-        final Element element = property.getElement();
-        this.element = element instanceof Vertex ?
-                DetachedVertex.detach((Vertex) element) :
-                DetachedEdge.detach((Edge) element);
+        final Element element = property.element();
+
+        if (element instanceof Vertex)
+            this.element = DetachedVertex.detach((Vertex) element);
+        else if (element instanceof VertexProperty)
+            this.element = DetachedVertexProperty.detach((VertexProperty) element);
+        else
+            this.element = DetachedEdge.detach((Edge) element);
     }
 
     @Override
@@ -72,7 +97,7 @@ public class DetachedProperty<V> implements Property, Serializable {
     }
 
     @Override
-    public Element getElement() {
+    public Element element() {
         return this.element;
     }
 
@@ -94,32 +119,33 @@ public class DetachedProperty<V> implements Property, Serializable {
 
     @Override
     public int hashCode() {
-        return this.hashCode;
+        return this.element.id.hashCode() + this.key.hashCode() + this.value.hashCode();
     }
 
+    @Override
     public Property<V> attach(final Vertex hostVertex) {
-        if (this.getElement() instanceof Vertex) {
-            return Optional.<Property<V>>of(hostVertex.property(this.key)).orElseThrow(() -> new IllegalStateException("The detached property could not be be found at the provided vertex: " + this));
-        } else {
-            final String label = this.getElement().label();
-            final Object id = this.getElement().id();
-            return StreamFactory.stream((Iterator<Edge>) hostVertex.outE(label))
-                    .filter(e -> e.id().equals(id))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("The detached property could not be be found at the provided vertex's edges: " + this))
-                    .property(this.key());
-
-        }
+        final Element hostElement = (Element) ((DetachedElement) this.element()).attach(hostVertex);
+        final Property<V> property = hostElement.property(this.isHidden() ? Graph.Key.hide(this.key) : this.key);
+        if (property.isPresent()) // && property.value().equals(this.value))
+            return property;
+        else
+            throw new IllegalStateException("The detached property could not be be found at the provided vertex: " + this);
     }
 
-    public Property<V> attach(final Graph graph) {
-        final Element element = (this.getElement() instanceof Vertex) ?
-                graph.v(this.getElement().id()) :
-                graph.e(this.getElement().id());
-        return Optional.<Property<V>>of(element.property(this.key)).orElseThrow(() -> new IllegalStateException("The detached property could not be found in the provided graph: " + this));
+    @Override
+    public Property<V> attach(final Graph hostGraph) {
+        final Element hostElement = (this.element() instanceof Vertex) ?
+                hostGraph.v(this.element().id()) :
+                hostGraph.e(this.element().id());
+        final Property<V> property = hostElement.property(this.isHidden() ? Graph.Key.hide(this.key) : this.key);
+        if (property.isPresent()) // && property.value().equals(this.value))
+            return property;
+        else
+            throw new IllegalStateException("The detached property could not be be found at the provided vertex: " + this);
     }
 
     public static DetachedProperty detach(final Property property) {
-        return new DetachedProperty(property);
+        if (null == property) throw Graph.Exceptions.argumentCanNotBeNull("property");
+        return (property instanceof DetachedProperty) ? (DetachedProperty) property : new DetachedProperty(property);
     }
 }

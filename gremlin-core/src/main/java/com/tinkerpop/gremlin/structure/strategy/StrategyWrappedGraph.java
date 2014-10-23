@@ -7,12 +7,11 @@ import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Transaction;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.util.StringFactory;
 import com.tinkerpop.gremlin.structure.util.wrapped.WrappedGraph;
 import com.tinkerpop.gremlin.util.function.FunctionUtils;
 
 import java.util.Optional;
-import java.util.function.Supplier;
-import java.util.function.UnaryOperator;
 
 /**
  * A wrapper class for {@link Graph} instances that host and apply a {@link GraphStrategy}.  The wrapper implements
@@ -29,6 +28,9 @@ public class StrategyWrappedGraph implements Graph, StrategyWrapped, WrappedGrap
     private Strategy.Context<StrategyWrappedGraph> graphContext;
 
     public StrategyWrappedGraph(final Graph baseGraph) {
+        if (baseGraph instanceof StrategyWrapped) throw new IllegalArgumentException(
+                String.format("The graph %s is already StrategyWrapped and must be a base Graph", baseGraph));
+
         this.baseGraph = baseGraph;
         this.graphContext = new Strategy.Context<>(baseGraph, this);
     }
@@ -115,7 +117,7 @@ public class StrategyWrappedGraph implements Graph, StrategyWrapped, WrappedGrap
         // compose function doesn't seem to want to work here even though it works with other Supplier<Void>
         // strategy functions. maybe the "throws Exception" is hosing it up.......
         if (strategy.getGraphStrategy().isPresent()) {
-            strategy.getGraphStrategy().get().getGraphClose(this.graphContext).apply(FunctionUtils.wrapSupplier(() -> {
+            strategy.getGraphStrategy().get().getGraphCloseStrategy(this.graphContext).apply(FunctionUtils.wrapSupplier(() -> {
                 baseGraph.close();
                 return null;
             })).get();
@@ -125,8 +127,8 @@ public class StrategyWrappedGraph implements Graph, StrategyWrapped, WrappedGrap
 
     @Override
     public String toString() {
-        final GraphStrategy strategy = this.strategy.getGraphStrategy().orElse(GraphStrategy.DoNothingGraphStrategy.INSTANCE);
-        return String.format("[%s[%s]]", strategy, baseGraph.toString());
+        final GraphStrategy strategy = this.strategy.getGraphStrategy().orElse(GraphStrategy.DefaultGraphStrategy.INSTANCE);
+        return StringFactory.graphStrategyString(strategy, this.baseGraph);
     }
 
     private <S, E> GraphTraversal<S, E> applyStrategy(final GraphTraversal<S, E> traversal) {

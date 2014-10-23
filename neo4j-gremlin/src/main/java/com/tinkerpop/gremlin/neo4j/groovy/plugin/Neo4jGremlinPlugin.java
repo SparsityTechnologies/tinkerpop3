@@ -2,7 +2,6 @@ package com.tinkerpop.gremlin.neo4j.groovy.plugin;
 
 import com.tinkerpop.gremlin.groovy.plugin.GremlinPlugin;
 import com.tinkerpop.gremlin.groovy.plugin.PluginAcceptor;
-import com.tinkerpop.gremlin.neo4j.groovy.loaders.Neo4jStepLoader;
 import com.tinkerpop.gremlin.neo4j.structure.Neo4jGraph;
 
 import java.util.HashSet;
@@ -22,16 +21,11 @@ public class Neo4jGremlinPlugin implements GremlinPlugin {
 
     @Override
     public String getName() {
-        return "neo4j";
+        return "tinkerpop.neo4j";
     }
 
     @Override
     public void pluginTo(final PluginAcceptor pluginAcceptor) {
         pluginAcceptor.addImports(IMPORTS);
-        try {
-            pluginAcceptor.eval(Neo4jStepLoader.class.getCanonicalName() + ".load()");
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
     }
 }

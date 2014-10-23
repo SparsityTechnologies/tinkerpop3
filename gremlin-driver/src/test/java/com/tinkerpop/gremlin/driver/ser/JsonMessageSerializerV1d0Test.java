@@ -2,6 +2,7 @@ package com.tinkerpop.gremlin.driver.ser;
 
 import com.tinkerpop.gremlin.driver.message.RequestMessage;
 import com.tinkerpop.gremlin.driver.message.ResponseMessage;
+import com.tinkerpop.gremlin.driver.message.ResponseStatusCode;
 import com.tinkerpop.gremlin.structure.Compare;
 import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Graph;
@@ -40,7 +41,7 @@ public class JsonMessageSerializerV1d0Test {
         final JSONObject json = new JSONObject(results);
         assertNotNull(json);
         assertEquals(msg.getRequestId().toString(), json.getString(SerTokens.TOKEN_REQUEST));
-        assertEquals(JSONObject.NULL, json.get(SerTokens.TOKEN_RESULT));
+        assertEquals(JSONObject.NULL, json.getJSONObject(SerTokens.TOKEN_RESULT).get(SerTokens.TOKEN_DATA));
     }
 
     @Test
@@ -54,7 +55,7 @@ public class JsonMessageSerializerV1d0Test {
 
         assertNotNull(json);
         assertEquals(msg.getRequestId().toString(), json.getString(SerTokens.TOKEN_REQUEST));
-        final JSONArray converted = json.getJSONArray(SerTokens.TOKEN_RESULT);
+        final JSONArray converted = json.getJSONObject(SerTokens.TOKEN_RESULT).getJSONArray(SerTokens.TOKEN_DATA);
 
         assertEquals(2, converted.length());
 
@@ -73,7 +74,7 @@ public class JsonMessageSerializerV1d0Test {
 
         assertNotNull(json);
         assertEquals(msg.getRequestId().toString(), json.getString(SerTokens.TOKEN_REQUEST));
-        final JSONArray converted = json.getJSONArray(SerTokens.TOKEN_RESULT);
+        final JSONArray converted = json.getJSONObject(SerTokens.TOKEN_RESULT).getJSONArray(SerTokens.TOKEN_DATA);
 
         assertEquals(2, converted.length());
 
@@ -94,7 +95,7 @@ public class JsonMessageSerializerV1d0Test {
 
         assertNotNull(json);
         assertEquals(msg.getRequestId().toString(), json.getString(SerTokens.TOKEN_REQUEST));
-        final JSONArray converted = json.getJSONArray(SerTokens.TOKEN_RESULT);
+        final JSONArray converted = json.getJSONObject(SerTokens.TOKEN_RESULT).getJSONArray(SerTokens.TOKEN_DATA);
 
         assertEquals(3, converted.length());
 
@@ -118,7 +119,7 @@ public class JsonMessageSerializerV1d0Test {
 
         assertNotNull(json);
         assertEquals(msg.getRequestId().toString(), json.getString(SerTokens.TOKEN_REQUEST));
-        final JSONObject jsonObject = json.getJSONObject(SerTokens.TOKEN_RESULT);
+        final JSONObject jsonObject = json.getJSONObject(SerTokens.TOKEN_RESULT).getJSONObject(SerTokens.TOKEN_DATA);
 
         assertNotNull(jsonObject);
         assertEquals("some", jsonObject.optString("y"));
@@ -141,7 +142,7 @@ public class JsonMessageSerializerV1d0Test {
 
         assertNotNull(json);
         assertEquals(msg.getRequestId().toString(), json.getString(SerTokens.TOKEN_REQUEST));
-        final JSONArray converted = json.getJSONArray(SerTokens.TOKEN_RESULT);
+        final JSONArray converted = json.getJSONObject(SerTokens.TOKEN_RESULT).getJSONArray(SerTokens.TOKEN_DATA);
 
         assertNotNull(converted);
         assertEquals(1, converted.length());
@@ -155,13 +156,13 @@ public class JsonMessageSerializerV1d0Test {
         final JSONObject properties = vertexAsJson.optJSONObject(GraphSONTokens.PROPERTIES);
         assertNotNull(properties);
 
-        assertEquals(123, properties.getInt("abc"));
+        assertEquals(123, properties.getJSONArray("abc").getJSONObject(0).getInt(GraphSONTokens.VALUE));
         assertEquals(1, properties.length());
 
         final JSONObject hiddens = vertexAsJson.optJSONObject(GraphSONTokens.HIDDENS);
         assertNotNull(hiddens);
 
-        assertEquals("stephen", hiddens.getString("hidden"));
+        assertEquals("stephen", hiddens.getJSONArray("hidden").getJSONObject(0).getString(GraphSONTokens.VALUE));
         assertEquals(1, hiddens.length());
     }
 
@@ -180,7 +181,7 @@ public class JsonMessageSerializerV1d0Test {
 
         assertNotNull(json);
         assertEquals(msg.getRequestId().toString(), json.getString(SerTokens.TOKEN_REQUEST));
-        final JSONArray converted = json.getJSONArray(SerTokens.TOKEN_RESULT);
+        final JSONArray converted = json.getJSONObject(SerTokens.TOKEN_RESULT).getJSONArray(SerTokens.TOKEN_DATA);
 
         assertNotNull(converted);
         assertEquals(1, converted.length());
@@ -221,7 +222,7 @@ public class JsonMessageSerializerV1d0Test {
 
         assertNotNull(json);
         assertEquals(msg.getRequestId().toString(), json.getString(SerTokens.TOKEN_REQUEST));
-        final JSONArray converted = json.getJSONArray(SerTokens.TOKEN_RESULT);
+        final JSONArray converted = json.getJSONObject(SerTokens.TOKEN_RESULT).getJSONArray(SerTokens.TOKEN_DATA);
 
         assertNotNull(converted);
         assertEquals(1, converted.length());
@@ -236,13 +237,13 @@ public class JsonMessageSerializerV1d0Test {
         assertNotNull(friendsProperty);
         assertEquals(3, friends.size());
 
-        final String object1 = friendsProperty.getString(0);
+        final String object1 = friendsProperty.getJSONObject(0).getJSONArray(GraphSONTokens.VALUE).getString(0);
         assertEquals("x", object1);
 
-        final int object2 = friendsProperty.getInt(1);
+        final int object2 = friendsProperty.getJSONObject(0).getJSONArray(GraphSONTokens.VALUE).getInt(1);
         assertEquals(5, object2);
 
-        final JSONObject object3 = friendsProperty.getJSONObject(2);
+        final JSONObject object3 = friendsProperty.getJSONObject(0).getJSONArray(GraphSONTokens.VALUE).getJSONObject(2);
         assertEquals(500, object3.getInt("x"));
         assertEquals("some", object3.getString("y"));
     }
@@ -251,14 +252,14 @@ public class JsonMessageSerializerV1d0Test {
     public void serializeToJsonMapWithElementForKey() throws Exception {
         final TinkerGraph g = TinkerFactory.createClassic();
         final Map<Vertex, Integer> map = new HashMap<>();
-        map.put(g.V().<Vertex>has("name", Compare.EQUAL, "marko").next(), 1000);
+        map.put(g.V().<Vertex>has("name", Compare.eq, "marko").next(), 1000);
 
         final String results = SERIALIZER.serializeResponseAsString(ResponseMessage.build(msg).result(map).create());
         final JSONObject json = new JSONObject(results);
 
         assertNotNull(json);
         assertEquals(msg.getRequestId().toString(), json.getString(SerTokens.TOKEN_REQUEST));
-        final JSONObject converted = json.getJSONObject(SerTokens.TOKEN_RESULT);
+        final JSONObject converted = json.getJSONObject(SerTokens.TOKEN_RESULT).getJSONObject(SerTokens.TOKEN_DATA);
 
         assertNotNull(converted);
 
@@ -290,6 +291,39 @@ public class JsonMessageSerializerV1d0Test {
     @Test(expected = SerializationException.class)
     public void deserializeRequestParseMessage() throws Exception {
         SERIALIZER.deserializeRequest("{\"requestId\":\"%s\",\"op\":\"eval\",\"args\":{\"x\":\"y\"}}");
+    }
+
+    @Test
+    public void serializeFullResponseMessage() throws Exception {
+        final UUID id = UUID.randomUUID();
+
+        final Map<String,Object> metaData = new HashMap<>();
+        metaData.put("test", "this");
+        metaData.put("one", 1);
+
+        final Map<String,Object> attributes = new HashMap<>();
+        attributes.put("test", "that");
+        attributes.put("two", 2);
+
+        final ResponseMessage response = ResponseMessage.build(id)
+                .responseMetaData(metaData)
+                .code(ResponseStatusCode.SUCCESS)
+                .result("some-result")
+                .statusAttributes(attributes)
+                .statusMessage("worked")
+                .create();
+
+        final String results = SERIALIZER.serializeResponseAsString(response);
+        final ResponseMessage deserialized = SERIALIZER.deserializeResponse(results);
+
+        assertEquals(id, deserialized.getRequestId());
+        assertEquals("this", deserialized.getResult().getMeta().get("test"));
+        assertEquals(1, deserialized.getResult().getMeta().get("one"));
+        assertEquals("some-result", deserialized.getResult().getData());
+        assertEquals("that", deserialized.getStatus().getAttributes().get("test"));
+        assertEquals(2, deserialized.getStatus().getAttributes().get("two"));
+        assertEquals(ResponseStatusCode.SUCCESS.getValue(), deserialized.getStatus().getCode().getValue());
+        assertEquals("worked", deserialized.getStatus().getMessage());
     }
 
     private class FunObject {

@@ -1,12 +1,14 @@
 package com.tinkerpop.gremlin.structure.strategy;
 
+import com.tinkerpop.gremlin.process.T;
 import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.VertexProperty;
 import com.tinkerpop.gremlin.structure.util.ElementHelper;
-import com.tinkerpop.gremlin.util.function.STriFunction;
+import com.tinkerpop.gremlin.util.function.TriFunction;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -14,7 +16,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiFunction;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -67,7 +68,7 @@ public class IdGraphStrategy implements GraphStrategy {
     }
 
     @Override
-    public UnaryOperator<STriFunction<String, Vertex, Object[], Edge>> getAddEdgeStrategy(final Strategy.Context<StrategyWrappedVertex> ctx) {
+    public UnaryOperator<TriFunction<String, Vertex, Object[], Edge>> getAddEdgeStrategy(final Strategy.Context<StrategyWrappedVertex> ctx) {
         return (f) -> (label, v, keyValues) -> {
             throwIfIdKeyIsSet(Edge.class, ElementHelper.getKeys(keyValues));
             return f.apply(label, v, this.injectId(supportsEdgeId, keyValues, edgeIdSupplier).toArray());
@@ -85,13 +86,17 @@ public class IdGraphStrategy implements GraphStrategy {
     }
 
     @Override
-    public UnaryOperator<Supplier<Object>> getElementId(final Strategy.Context<? extends StrategyWrappedElement> ctx) {
-        return supportsAnId(ctx.getCurrent().getClass()) ?
-                (f) -> () -> ctx.getCurrent().getBaseElement().property(idKey).value() : UnaryOperator.identity();
+    public UnaryOperator<Supplier<Object>> getVertexIdStrategy(final Strategy.Context<StrategyWrappedVertex> ctx) {
+        return supportsVertexId ? (f) -> () -> ctx.getCurrent().getBaseVertex().value(idKey) : UnaryOperator.identity();
     }
 
     @Override
-    public <V> UnaryOperator<BiFunction<String, V, Property<V>>> getElementProperty(final Strategy.Context<? extends StrategyWrappedElement> ctx) {
+    public UnaryOperator<Supplier<Object>> getEdgeIdStrategy(final Strategy.Context<StrategyWrappedEdge> ctx) {
+        return supportsEdgeId ? (f) -> () -> ctx.getCurrent().getBaseEdge().value(idKey) : UnaryOperator.identity();
+    }
+
+    @Override
+    public <V> UnaryOperator<BiFunction<String, V, VertexProperty<V>>> getVertexPropertyStrategy(final Strategy.Context<StrategyWrappedVertex> ctx) {
         return (f) -> (k, v) -> {
             throwIfIdKeyIsSet(ctx.getCurrent().getClass(), k);
             return f.apply(k, v);
@@ -99,16 +104,16 @@ public class IdGraphStrategy implements GraphStrategy {
     }
 
     @Override
-    public UnaryOperator<Consumer<Object[]>> getElementPropertiesSetter(Strategy.Context<? extends StrategyWrappedElement> ctx) {
-        return (f) -> (kvs) -> {
-            throwIfIdKeyIsSet(ctx.getCurrent().getClass(), ElementHelper.getKeys(kvs));
-            f.accept(kvs);
+    public <V> UnaryOperator<BiFunction<String, V, Property<V>>> getEdgePropertyStrategy(final Strategy.Context<StrategyWrappedEdge> ctx) {
+        return (f) -> (k, v) -> {
+            throwIfIdKeyIsSet(ctx.getCurrent().getClass(), k);
+            return f.apply(k, v);
         };
     }
 
     @Override
     public String toString() {
-        return String.format("%s[%s]", IdGraphStrategy.class.getSimpleName(), idKey).toLowerCase();
+        return this.getClass().getSimpleName().toLowerCase();
     }
 
     private void throwIfIdKeyIsSet(final Class<? extends Element> element, final String k) {
@@ -145,7 +150,7 @@ public class IdGraphStrategy implements GraphStrategy {
         final List<Object> o = new ArrayList<>(Arrays.asList(keyValues));
         if (supports) {
             final Object val = ElementHelper.getIdValue(keyValues).orElse(idMaker.get());
-            final int pos = o.indexOf(Element.ID);
+            final int pos = o.indexOf(T.id);
             if (pos > -1) {
                 o.remove(pos);
                 o.remove(pos);
@@ -157,6 +162,15 @@ public class IdGraphStrategy implements GraphStrategy {
         return o;
     }
 
+    /**
+     * Create the {@link Builder} to create a {@link IdGraphStrategy}.
+     *
+     * @param idKey The key to use for the index to lookup graph elements.
+     */
+    public static Builder build(final String idKey) {
+        return new Builder(idKey);
+    }
+
     public static final class Builder {
         private final String idKey;
         private Supplier<?> vertexIdSupplier;
@@ -165,12 +179,7 @@ public class IdGraphStrategy implements GraphStrategy {
         private boolean supportsEdgeId;
         private boolean hiddenIdKey;
 
-        /**
-         * Create the {@link Builder} to create a {@link IdGraphStrategy}.
-         *
-         * @param idKey The key to use for the index to lookup graph elements.
-         */
-        public Builder(final String idKey) {
+        private Builder(final String idKey) {
             this.idKey = idKey;
             this.edgeIdSupplier = this::supplyStringId;
             this.vertexIdSupplier = this::supplyStringId;
@@ -179,7 +188,7 @@ public class IdGraphStrategy implements GraphStrategy {
             this.hiddenIdKey = false;
         }
 
-        public IdGraphStrategy build() {
+        public IdGraphStrategy create() {
             if (!this.supportsEdgeId && !this.supportsVertexId)
                 throw new IllegalStateException("Since supportsEdgeId and supportsVertexId are false, there is no need to use IdGraphStrategy");
 

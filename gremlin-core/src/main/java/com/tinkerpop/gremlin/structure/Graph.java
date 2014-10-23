@@ -1,5 +1,6 @@
 package com.tinkerpop.gremlin.structure;
 
+import com.tinkerpop.gremlin.process.T;
 import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.process.computer.GraphComputer;
 import com.tinkerpop.gremlin.process.graph.GraphTraversal;
@@ -21,13 +22,57 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * A {@link Graph} is a container object for a collection of {@link Vertex}, {@link Edge}, and {@link Property}
- * objects.
+ * A {@link Graph} is a container object for a collection of {@link Vertex}, {@link Edge}, {@link VertexProperty},
+ * and {@link Property} objects.
  *
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  * @author Stephen Mallette (http://stephen.genoprime.com)
  */
 public interface Graph extends AutoCloseable {
+
+    public static final String GRAPH = "gremlin.graph";
+
+    /**
+     * This should only be used by vendors to create keys in a namespace safe from users.
+     */
+    public class System {
+
+        /**
+         * The prefix to denote that a key is a system key.
+         */
+        private static final String SYSTEM_PREFIX = "^";
+        private static final int SYSTEM_PREFIX_LENGTH = SYSTEM_PREFIX.length();
+
+        /**
+         * Turn the provided key into a system key. If the key is already a system key, return key.
+         *
+         * @param key The key to make a system key
+         * @return The system key
+         */
+        public static String system(final String key) {
+            return isSystem(key) ? key : SYSTEM_PREFIX.concat(key);
+        }
+
+        /**
+         * Turn the provided system key into an non-system key. If the key is not a system key, return key.
+         *
+         * @param key The system key
+         * @return The non-system representation of the key
+         */
+        public static String unSystem(final String key) {
+            return isSystem(key) ? key.substring(SYSTEM_PREFIX_LENGTH) : key;
+        }
+
+        /**
+         * Determines whether the provided key is a system key or not.
+         *
+         * @param key The key to check for system status
+         * @return Whether the provided key is a system key or not
+         */
+        public static boolean isSystem(final String key) {
+            return key.startsWith(SYSTEM_PREFIX);
+        }
+    }
 
     /**
      * Key is a helper class for manipulating keys wherever they may be (e.g. properties, sideEffects, sideEffects, etc.)
@@ -38,6 +83,7 @@ public interface Graph extends AutoCloseable {
          * The prefix to denote that a key is hidden.
          */
         private static final String HIDDEN_PREFIX = "~";
+        private static final int HIDDEN_PREFIX_LENGTH = HIDDEN_PREFIX.length();
 
         /**
          * Turn the provided key into a hidden key. If the key is already hidden, return key.
@@ -56,7 +102,7 @@ public interface Graph extends AutoCloseable {
          * @return The unhidden representation of the key
          */
         public static String unHide(final String key) {
-            return isHidden(key) ? key.substring(HIDDEN_PREFIX.length()) : key;
+            return isHidden(key) ? key.substring(HIDDEN_PREFIX_LENGTH) : key;
         }
 
         /**
@@ -82,6 +128,16 @@ public interface Graph extends AutoCloseable {
     public Vertex addVertex(final Object... keyValues);
 
     /**
+     * Add a {@link Vertex} to the graph with provided vertex label.
+     *
+     * @param label the label of the vertex
+     * @return The newly created labeled vertex
+     */
+    public default Vertex addVertex(final String label) {
+        return this.addVertex(T.label, label);
+    }
+
+    /**
      * Get a {@link Vertex} given its unique identifier.
      *
      * @param id The unique identifier of the vertex to locate
@@ -89,7 +145,7 @@ public interface Graph extends AutoCloseable {
      */
     public default Vertex v(final Object id) throws NoSuchElementException {
         if (null == id) throw Graph.Exceptions.elementNotFound(Vertex.class, null);
-        return (Vertex) this.V().has(Element.ID, id).next();
+        return (Vertex) this.V().has(T.id, id).next();
     }
 
     /**
@@ -100,7 +156,7 @@ public interface Graph extends AutoCloseable {
      */
     public default Edge e(final Object id) throws NoSuchElementException {
         if (null == id) throw Graph.Exceptions.elementNotFound(Edge.class, null);
-        return (Edge) this.E().has(Element.ID, id).next();
+        return (Edge) this.E().has(T.id, id).next();
     }
 
     /**
@@ -302,12 +358,41 @@ public interface Graph extends AutoCloseable {
          */
         public interface VertexFeatures extends ElementFeatures {
             public static final String FEATURE_ADD_VERTICES = "AddVertices";
+            public static final String FEATURE_MULTI_PROPERTIES = "MultiProperties";
+            public static final String FEATURE_META_PROPERTIES = "MetaProperties";
+            public static final String FEATURE_REMOVE_VERTICES = "RemoveVertices";
 
             /**
              * Determines if a {@link Vertex} can be added to the {@code Graph}.
              */
             @FeatureDescriptor(name = FEATURE_ADD_VERTICES)
             public default boolean supportsAddVertices() {
+                return true;
+            }
+
+            /**
+             * Determines if a {@link Vertex} can be removed from the {@code Graph}.
+             */
+            @FeatureDescriptor(name = FEATURE_REMOVE_VERTICES)
+            public default boolean supportsRemoveVertices() {
+                return true;
+            }
+
+            /**
+             * Determines if a {@link Vertex} can support multiple properties with the same key.
+             */
+            @FeatureDescriptor(name = FEATURE_MULTI_PROPERTIES)
+            public default boolean supportsMultiProperties() {
+                return true;
+            }
+
+            /**
+             * Determines if a {@link Vertex} can support properties on vertex properties.  It is assumed that a
+             * graph will support all the same data types for meta-properties that are supported for regular
+             * properties.
+             */
+            @FeatureDescriptor(name = FEATURE_META_PROPERTIES)
+            public default boolean supportsMetaProperties() {
                 return true;
             }
 
@@ -325,12 +410,21 @@ public interface Graph extends AutoCloseable {
          */
         public interface EdgeFeatures extends ElementFeatures {
             public static final String FEATURE_ADD_EDGES = "AddEdges";
+            public static final String FEATURE_REMOVE_EDGES = "RemoveEdges";
 
             /**
-             * Determines if an {@link Edge} can be added to the {@code Graph}.
+             * Determines if an {@link Edge} can be added to a {@code Vertex}.
              */
             @FeatureDescriptor(name = FEATURE_ADD_EDGES)
             public default boolean supportsAddEdges() {
+                return true;
+            }
+
+            /**
+             * Determines if an {@link Edge} can be removed from a {@code Vertex}.
+             */
+            @FeatureDescriptor(name = FEATURE_REMOVE_EDGES)
+            public default boolean supportsRemoveEdges() {
                 return true;
             }
 
@@ -353,6 +447,25 @@ public interface Graph extends AutoCloseable {
             public static final String FEATURE_UUID_IDS = "UuidIds";
             public static final String FEATURE_CUSTOM_IDS = "CustomIds";
             public static final String FEATURE_ANY_IDS = "AnyIds";
+            public static final String FEATURE_ADD_PROPERTY = "AddProperty";
+            public static final String FEATURE_REMOVE_PROPERTY = "RemoveProperty";
+
+            /**
+             * Determines if an {@link Element} allows properties to be added.  This feature is set independently from
+             * supporting "data types" and refers to support of calls to {@link Element#property(String, Object)}.
+             */
+            @FeatureDescriptor(name = FEATURE_ADD_PROPERTY)
+            public default boolean supportsAddProperty() {
+                return true;
+            }
+
+            /**
+             * Determines if an {@link Element} allows properties to be removed.
+             */
+            @FeatureDescriptor(name = FEATURE_REMOVE_PROPERTY)
+            public default boolean supportsRemoveProperty() {
+                return true;
+            }
 
             /**
              * Determines if an {@link Element} can have a user defined identifier.  Implementation that do not support
@@ -409,6 +522,79 @@ public interface Graph extends AutoCloseable {
          * Features that are related to {@link Vertex} {@link Property} objects.
          */
         public interface VertexPropertyFeatures extends PropertyFeatures {
+            public static final String FEATURE_ADD_PROPERTY = "AddProperty";
+            public static final String FEATURE_REMOVE_PROPERTY = "RemoveProperty";
+            public static final String FEATURE_USER_SUPPLIED_IDS = "UserSuppliedIds";
+            public static final String FEATURE_NUMERIC_IDS = "NumericIds";
+            public static final String FEATURE_STRING_IDS = "StringIds";
+            public static final String FEATURE_UUID_IDS = "UuidIds";
+            public static final String FEATURE_CUSTOM_IDS = "CustomIds";
+            public static final String FEATURE_ANY_IDS = "AnyIds";
+
+            /**
+             * Determines if a {@link VertexProperty} allows properties to be added.
+             */
+            @FeatureDescriptor(name = FEATURE_ADD_PROPERTY)
+            public default boolean supportsAddProperty() {
+                return true;
+            }
+
+            /**
+             * Determines if a {@link VertexProperty} allows properties to be removed.
+             */
+            @FeatureDescriptor(name = FEATURE_REMOVE_PROPERTY)
+            public default boolean supportsRemoveProperty() {
+                return true;
+            }
+
+            /**
+             * Determines if a {@link VertexProperty} allows an identifier to be assigned to it.
+             */
+            @FeatureDescriptor(name = FEATURE_USER_SUPPLIED_IDS)
+            public default boolean supportsUserSuppliedIds() {
+                return true;
+            }
+
+            /**
+             * Determines if an {@link VertexProperty} has numeric identifiers.
+             */
+            @FeatureDescriptor(name = FEATURE_NUMERIC_IDS)
+            public default boolean supportsNumericIds() {
+                return true;
+            }
+
+            /**
+             * Determines if an {@link VertexProperty} has string identifiers.
+             */
+            @FeatureDescriptor(name = FEATURE_STRING_IDS)
+            public default boolean supportsStringIds() {
+                return true;
+            }
+
+            /**
+             * Determines if an {@link VertexProperty} has UUID identifiers.
+             */
+            @FeatureDescriptor(name = FEATURE_UUID_IDS)
+            public default boolean supportsUuidIds() {
+                return true;
+            }
+
+            /**
+             * Determines if an {@link VertexProperty} has custom identifiers where "custom" refers to an implementation
+             * defined object.
+             */
+            @FeatureDescriptor(name = FEATURE_CUSTOM_IDS)
+            public default boolean supportsCustomIds() {
+                return true;
+            }
+
+            /**
+             * Determines if an {@link VertexProperty} any Java object is a suitable identifier.
+             */
+            @FeatureDescriptor(name = FEATURE_ANY_IDS)
+            public default boolean supportsAnyIds() {
+                return true;
+            }
         }
 
         /**
@@ -424,7 +610,9 @@ public interface Graph extends AutoCloseable {
             public static final String FEATURE_PROPERTIES = "Properties";
 
             /**
-             * If any of the features on PropertyFeatures is true then this value must be true.
+             * Determines if an {@link Element} allows for the processing of at least one data type defined by the
+             * features.  In this case "processing" refers to at least "reading" the data type. If any of the
+             * features on {@link PropertyFeatures} is true then this value must be true.
              */
             @FeatureDescriptor(name = FEATURE_PROPERTIES)
             public default boolean supportsProperties() {
@@ -677,7 +865,7 @@ public interface Graph extends AutoCloseable {
      */
     public static class Exceptions {
 
-        private static final boolean debug = Boolean.parseBoolean(System.getenv().getOrDefault("gremlin.structure.debug", "false"));
+        private static final boolean debug = Boolean.parseBoolean(java.lang.System.getenv().getOrDefault("gremlin.structure.debug", "false"));
 
         public static UnsupportedOperationException variablesNotSupported() {
             return new UnsupportedOperationException("Graph does not support graph variables");
@@ -693,14 +881,6 @@ public interface Graph extends AutoCloseable {
 
         public static IllegalArgumentException graphDoesNotSupportProvidedGraphComputer(final Class graphComputerClass) {
             return new IllegalArgumentException("Graph does not support the provided graph computer: " + graphComputerClass.getSimpleName());
-        }
-
-        public static UnsupportedOperationException vertexLookupsNotSupported() {
-            return new UnsupportedOperationException("Graph does not support vertex lookups by id");
-        }
-
-        public static UnsupportedOperationException edgeLookupsNotSupported() {
-            return new UnsupportedOperationException("Graph does not support edge lookups by id");
         }
 
         public static UnsupportedOperationException vertexAdditionsNotSupported() {
@@ -743,6 +923,10 @@ public interface Graph extends AutoCloseable {
         public static String SUITE_STRUCTURE_PERFORMANCE = "com.tinkerpop.gremlin.structure.StructurePerformanceSuite";
         public static String SUITE_PROCESS_COMPUTER = "com.tinkerpop.gremlin.process.ProcessComputerSuite";
         public static String SUITE_PROCESS_STANDARD = "com.tinkerpop.gremlin.process.ProcessStandardSuite";
+        public static String SUITE_GROOVY_PROCESS_STANDARD = "com.tinkerpop.gremlin.process.GroovyProcessStandardSuite";
+        public static String SUITE_GROOVY_PROCESS_COMPUTER = "com.tinkerpop.gremlin.process.GroovyProcessComputerSuite";
+        public static String SUITE_GROOVY_ENVIRONMENT = "com.tinkerpop.gremlin.groovy.GroovyEnvironmentSuite";
+        public static String SUITE_GROOVY_ENVIRONMENT_INTEGRATE = "com.tinkerpop.gremlin.groovy.GroovyEnvironmentIntegrateSuite";
 
         /**
          * The test suite class to opt in to.

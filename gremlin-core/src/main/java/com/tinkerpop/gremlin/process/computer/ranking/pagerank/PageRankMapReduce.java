@@ -1,9 +1,9 @@
 package com.tinkerpop.gremlin.process.computer.ranking.pagerank;
 
 import com.tinkerpop.gremlin.process.computer.MapReduce;
-import com.tinkerpop.gremlin.process.computer.ranking.pagerank.PageRankVertexProgram;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.util.StringFactory;
 import org.apache.commons.configuration.Configuration;
 import org.javatuples.Pair;
 
@@ -14,7 +14,7 @@ import java.util.Iterator;
  */
 public class PageRankMapReduce implements MapReduce<Object, Double, Object, Double, Iterator<Pair<Object, Double>>> {
 
-    public static final String PAGE_RANK_SIDE_EFFECT_KEY = "gremlin.pageRank.sideEffectKey";
+    public static final String PAGE_RANK_SIDE_EFFECT_KEY = "gremlin.pageRankMapReduce.sideEffectKey";
     public static final String DEFAULT_SIDE_EFFECT_KEY = "pageRank";
 
     private String sideEffectKey = DEFAULT_SIDE_EFFECT_KEY;
@@ -51,12 +51,17 @@ public class PageRankMapReduce implements MapReduce<Object, Double, Object, Doub
     }
 
     @Override
-    public Iterator<Pair<Object, Double>> generateSideEffect(final Iterator<Pair<Object, Double>> keyValues) {
+    public Iterator<Pair<Object, Double>> generateFinalResult(final Iterator<Pair<Object, Double>> keyValues) {
         return keyValues;
     }
 
     @Override
-    public String getSideEffectKey() {
+    public String getMemoryKey() {
         return this.sideEffectKey;
+    }
+
+    @Override
+    public String toString() {
+        return StringFactory.mapReduceString(this, this.sideEffectKey);
     }
 }

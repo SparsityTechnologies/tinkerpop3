@@ -100,7 +100,7 @@ public class SubgraphStrategy implements GraphStrategy {
 
     @Override
     public String toString() {
-        return SubgraphStrategy.class.getSimpleName();
+        return SubgraphStrategy.class.getSimpleName().toLowerCase();
     }
 
     private class SubgraphTraversalStrategy implements TraversalStrategy.NoDependencies {
@@ -161,7 +161,7 @@ public class SubgraphStrategy implements GraphStrategy {
         private final Direction direction;
 
         public SubgraphVertexStep(final VertexStep<E> other) {
-            this(other.getTraversal(), other.returnClass, other.direction, other.branchFactor, other.edgeLabels);
+            this(other.getTraversal(), other.getReturnClass(), other.getDirection(), other.getBranchFactor(), other.getEdgeLabels());
         }
 
         public SubgraphVertexStep(final Traversal traversal,

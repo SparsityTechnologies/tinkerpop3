@@ -5,15 +5,16 @@ import com.tinkerpop.gremlin.process.Step;
 import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.process.TraversalStrategy;
 import com.tinkerpop.gremlin.process.graph.step.filter.HasStep;
-import com.tinkerpop.gremlin.process.graph.step.util.IdentityStep;
 import com.tinkerpop.gremlin.process.graph.step.filter.IntervalStep;
+import com.tinkerpop.gremlin.process.graph.step.sideEffect.IdentityStep;
+import com.tinkerpop.gremlin.process.graph.strategy.AbstractTraversalStrategy;
 import com.tinkerpop.gremlin.process.util.EmptyStep;
 import com.tinkerpop.gremlin.process.util.TraversalHelper;
 
 /**
  * @author Pieter Martin
  */
-public class Neo4jGraphStepStrategy implements TraversalStrategy.NoDependencies {
+public class Neo4jGraphStepStrategy extends AbstractTraversalStrategy implements TraversalStrategy.NoDependencies {
 
     private static final Neo4jGraphStepStrategy INSTANCE = new Neo4jGraphStepStrategy();
 
@@ -29,11 +30,10 @@ public class Neo4jGraphStepStrategy implements TraversalStrategy.NoDependencies 
                 if (currentStep == EmptyStep.instance() || TraversalHelper.isLabeled(currentStep)) break;
 
                 if (currentStep instanceof HasStep) {
-                    neo4jGraphStep.hasContainers.add(((HasStep) currentStep).hasContainer);
+                    neo4jGraphStep.hasContainers.addAll(((HasStep) currentStep).getHasContainers());
                     TraversalHelper.removeStep(currentStep, traversal);
                 } else if (currentStep instanceof IntervalStep) {
-                    neo4jGraphStep.hasContainers.add(((IntervalStep) currentStep).startContainer);
-                    neo4jGraphStep.hasContainers.add(((IntervalStep) currentStep).endContainer);
+                    neo4jGraphStep.hasContainers.addAll(((IntervalStep) currentStep).getHasContainers());
                     TraversalHelper.removeStep(currentStep, traversal);
                 } else if (currentStep instanceof IdentityStep) {
                     // do nothing

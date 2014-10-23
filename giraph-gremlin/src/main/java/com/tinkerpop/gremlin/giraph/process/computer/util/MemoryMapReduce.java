@@ -3,6 +3,7 @@ package com.tinkerpop.gremlin.giraph.process.computer.util;
 import com.tinkerpop.gremlin.giraph.Constants;
 import com.tinkerpop.gremlin.process.computer.MapReduce;
 import com.tinkerpop.gremlin.process.computer.Memory;
+import com.tinkerpop.gremlin.process.computer.util.GraphComputerHelper;
 import com.tinkerpop.gremlin.structure.Vertex;
 import org.apache.commons.configuration.Configuration;
 import org.javatuples.Pair;
@@ -19,13 +20,13 @@ import java.util.Set;
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class MemoryMapReduce implements MapReduce<String, Object, String, Object, Map<String, Object>> {
+public final class MemoryMapReduce implements MapReduce<String, Object, String, Object, Map<String, Object>> {
 
     public Set<String> memoryKeys = new HashSet<>();
 
     @Override
-    public String getSideEffectKey() {
-        return Constants.HIDDEN_MEMORY;
+    public String getMemoryKey() {
+        return Constants.SYSTEM_MEMORY;
     }
 
     public MemoryMapReduce() {
@@ -72,7 +73,7 @@ public class MemoryMapReduce implements MapReduce<String, Object, String, Object
     }
 
     @Override
-    public Map<String, Object> generateSideEffect(final Iterator<Pair<String, Object>> keyValues) {
+    public Map<String, Object> generateFinalResult(final Iterator<Pair<String, Object>> keyValues) {
         final Map<String, Object> map = new HashMap<>();
         while (keyValues.hasNext()) {
             final Pair<String, Object> pair = keyValues.next();
@@ -82,11 +83,21 @@ public class MemoryMapReduce implements MapReduce<String, Object, String, Object
     }
 
     @Override
-    public void addSideEffectToMemory(final Memory memory, final Iterator<Pair<String, Object>> keyValues) {
+    public void addResultToMemory(final Memory memory, final Iterator<Pair<String, Object>> keyValues) {
         while (keyValues.hasNext()) {
             final Pair<String, Object> keyValue = keyValues.next();
             memory.set(keyValue.getValue0(), keyValue.getValue1());
         }
+    }
+
+    @Override
+    public int hashCode() {
+        return (this.getClass().getCanonicalName() + Constants.SYSTEM_MEMORY).hashCode();
+    }
+
+    @Override
+    public boolean equals(final Object object) {
+        return GraphComputerHelper.areEqual(this, object);
     }
 
 }

@@ -1,15 +1,15 @@
 package com.tinkerpop.gremlin.process.graph.strategy;
 
-import com.tinkerpop.gremlin.process.Step;
 import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.process.TraversalStrategy;
-import com.tinkerpop.gremlin.process.graph.step.util.LabelIdentityStep;
+import com.tinkerpop.gremlin.process.graph.step.util.MarkerIdentityStep;
 import com.tinkerpop.gremlin.process.util.TraversalHelper;
+import com.tinkerpop.gremlin.structure.util.StringFactory;
 
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class LabeledEndStepStrategy implements TraversalStrategy {
+public class LabeledEndStepStrategy implements TraversalStrategy.NoDependencies {
 
     private static final LabeledEndStepStrategy INSTANCE = new LabeledEndStepStrategy();
 
@@ -17,10 +17,9 @@ public class LabeledEndStepStrategy implements TraversalStrategy {
     }
 
     @Override
-    public void apply(final Traversal traversal) {
-        final Step step = TraversalHelper.getEnd(traversal);
-        if (TraversalHelper.isLabeled(step))
-            TraversalHelper.insertStep(new LabelIdentityStep<>(traversal), traversal.getSteps().size(), traversal);
+    public void apply(final Traversal<?, ?> traversal) {
+        if (TraversalHelper.isLabeled(TraversalHelper.getEnd(traversal)))
+            traversal.addStep(new MarkerIdentityStep<>(traversal));
     }
 
     public static LabeledEndStepStrategy instance() {
@@ -28,7 +27,7 @@ public class LabeledEndStepStrategy implements TraversalStrategy {
     }
 
     @Override
-    public int compareTo(final TraversalStrategy traversalStrategy) {
-        return traversalStrategy instanceof TraverserSourceStrategy ? -1 : 1;
+    public String toString() {
+        return StringFactory.traversalStrategyString(this);
     }
 }

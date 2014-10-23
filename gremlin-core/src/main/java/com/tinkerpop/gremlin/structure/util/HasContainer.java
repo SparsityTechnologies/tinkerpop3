@@ -1,26 +1,27 @@
 package com.tinkerpop.gremlin.structure.util;
 
+import com.tinkerpop.gremlin.process.T;
 import com.tinkerpop.gremlin.structure.Contains;
 import com.tinkerpop.gremlin.structure.Element;
+import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Property;
-import com.tinkerpop.gremlin.util.function.SBiPredicate;
+import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.VertexProperty;
 
-import java.io.Serializable;
+import java.util.Iterator;
 import java.util.List;
 import java.util.function.BiPredicate;
 
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class HasContainer implements Serializable {
+public class HasContainer {
 
-    public String label;
     public String key;
-    public SBiPredicate predicate;
+    public BiPredicate predicate;
     public Object value;
 
-    public HasContainer(final String label, final String key, final SBiPredicate predicate, final Object value) {
-        this.label = label;
+    public HasContainer(final String key, final BiPredicate predicate, final Object value) {
         this.key = key;
         this.predicate = predicate;
         this.value = value;
@@ -29,30 +30,44 @@ public class HasContainer implements Serializable {
         }
     }
 
-    public HasContainer(final String key, final SBiPredicate predicate, final Object value) {
-        this(null, key, predicate, value);
+    public HasContainer(final String key, final Contains contains) {
+        this(key, contains, null);
     }
 
-    public HasContainer(final String key, final Contains contains) {
-        this(null, key, contains, null);
+    public HasContainer(final T accessor, final BiPredicate predicate, final Object value) {
+        this(accessor.getAccessor(), predicate, value);
+    }
+
+    public HasContainer(final T accessor, final Contains contains) {
+        this(accessor.getAccessor(), contains, null);
     }
 
     public boolean test(final Element element) {
         if (null != this.value) {
 
-            if (null != this.label && !element.label().equals(this.label))
-                return false;
-
-            if (this.key.equals(Element.ID))
+            if (this.key.equals(T.id.getAccessor()))
                 return this.predicate.test(element.id(), this.value);
-            else if (this.key.equals(Element.LABEL))
+            else if (this.key.equals(T.label.getAccessor()))
                 return this.predicate.test(element.label(), this.value);
+            else if (element instanceof VertexProperty && this.key.equals(T.value.getAccessor()))
+                return this.predicate.test(((VertexProperty) element).value(), this.value);
+            else if (element instanceof VertexProperty && this.key.equals(T.key.getAccessor()))
+                return this.predicate.test(((VertexProperty) element).key(), this.value);
             else {
-                final Property property = element.property(this.key);
-                return property.isPresent() && this.predicate.test(property.value(), this.value);
+                if (element instanceof Vertex) {
+                    final Iterator<? extends Property> itty = element.iterators().propertyIterator(this.key);
+                    while (itty.hasNext()) {
+                        if (this.predicate.test(itty.next().value(), this.value))
+                            return true;
+                    }
+                    return false;
+                } else {
+                    final Property property = element.property(this.key);
+                    return property.isPresent() && this.predicate.test(property.value(), this.value);
+                }
             }
         } else {
-            return Contains.IN.equals(this.predicate) ?
+            return Contains.within.equals(this.predicate) ?
                     element.property(this.key).isPresent() :
                     !element.property(this.key).isPresent();
         }
@@ -70,18 +85,12 @@ public class HasContainer implements Serializable {
         }
     }
 
-    public boolean hasLabel() {
-        return this.label != null;
-    }
-
+    // note that if the user is looking for a label property key (e.g.), then it will look the same as looking for the label of the element.
     public String toString() {
         return this.value == null ?
-                (this.predicate == Contains.IN ?
-                        "[" + this.key + "]" :
-                        "[!" + this.key + "]") :
-                (this.label == null) ?
-                        "[" + this.key + "," + this.predicate + "," + this.value + "]" :
-                        "[" + this.label + ":" + this.key + "," + this.predicate + "," + this.value + "]";
+                (this.predicate == Contains.within ?
+                        "[" + Graph.System.unSystem(this.key) + "]" :
+                        "[!" + Graph.System.unSystem(this.key) + "]") :
+                "[" + Graph.System.unSystem(this.key) + "," + this.predicate + "," + this.value + "]";
     }
-
 }

@@ -4,7 +4,7 @@ import com.codahale.metrics.Timer;
 import com.tinkerpop.gremlin.driver.Tokens;
 import com.tinkerpop.gremlin.driver.message.RequestMessage;
 import com.tinkerpop.gremlin.driver.message.ResponseMessage;
-import com.tinkerpop.gremlin.driver.message.ResultCode;
+import com.tinkerpop.gremlin.driver.message.ResponseStatusCode;
 import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.process.util.SingleIterator;
 import com.tinkerpop.gremlin.server.Context;
@@ -13,7 +13,6 @@ import com.tinkerpop.gremlin.server.op.OpProcessorException;
 import com.tinkerpop.gremlin.server.util.MetricManager;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.util.Serializer;
-import com.tinkerpop.gremlin.util.function.SFunction;
 import io.netty.channel.ChannelHandlerContext;
 import org.apache.commons.collections.iterators.ArrayIterator;
 import org.javatuples.Pair;
@@ -27,6 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import static com.codahale.metrics.MetricRegistry.name;
@@ -71,7 +71,7 @@ final class SessionOps {
         future.thenAccept(o -> ctx.write(Pair.with(msg, convertToIterator(o))));
         future.exceptionally(se -> {
             logger.warn(String.format("Exception processing a script on request [%s].", msg), se);
-            ctx.writeAndFlush(ResponseMessage.build(msg).code(ResultCode.SERVER_ERROR_SCRIPT_EVALUATION).result(se.getMessage()).create());
+            ctx.writeAndFlush(ResponseMessage.build(msg).code(ResponseStatusCode.SERVER_ERROR_SCRIPT_EVALUATION).statusMessage(se.getMessage()).create());
             return null;
         });
     }
@@ -89,15 +89,15 @@ final class SessionOps {
 
         // parameter bindings override session bindings
         sessionBindings.putAll(bindings);
-        final SFunction<Graph, Traversal> traversal;
+        final Function<Graph, Traversal> traversal;
         try {
             // deserialize the traversal and shove it into the bindings so that it can be executed within the
             // scriptengine.  the scriptengine acts as a sandbox within which to execute the traversal.
-            traversal = (SFunction<Graph, Traversal>) Serializer.deserializeObject((byte[]) args.get(Tokens.ARGS_GREMLIN));
+            traversal = (Function<Graph, Traversal>) Serializer.deserializeObject((byte[]) args.get(Tokens.ARGS_GREMLIN));
             bindings.put("____trvrslScrpt", traversal);
         } catch (Exception ex) {
             logger.warn(String.format("Exception processing a traversal on request [%s].", msg), ex);
-            ctx.writeAndFlush(ResponseMessage.build(msg).code(ResultCode.SERVER_ERROR_TRAVERSAL_EVALUATION).result(ex.getMessage()).create());
+            ctx.writeAndFlush(ResponseMessage.build(msg).code(ResponseStatusCode.SERVER_ERROR_TRAVERSAL_EVALUATION).statusMessage(ex.getMessage()).create());
             return;
         }
 
@@ -107,7 +107,7 @@ final class SessionOps {
         future.thenAccept(o -> ctx.write(Pair.with(msg, convertToIterator(o))));
         future.exceptionally(se -> {
             logger.warn(String.format("Exception processing a traversal on request [%s].", msg), se);
-            ctx.writeAndFlush(ResponseMessage.build(msg).code(ResultCode.SERVER_ERROR_TRAVERSAL_EVALUATION).result(se.getMessage()).create());
+            ctx.writeAndFlush(ResponseMessage.build(msg).code(ResponseStatusCode.SERVER_ERROR_TRAVERSAL_EVALUATION).statusMessage(se.getMessage()).create());
             return null;
         });
     }

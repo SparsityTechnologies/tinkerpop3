@@ -6,15 +6,15 @@ import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.tinkerpop.gremlin.process.T;
 import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
-import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Vertex;
 import com.tinkerpop.gremlin.structure.io.GraphReader;
 import com.tinkerpop.gremlin.structure.util.batch.BatchGraph;
-import com.tinkerpop.gremlin.util.function.SQuintFunction;
-import com.tinkerpop.gremlin.util.function.STriFunction;
+import com.tinkerpop.gremlin.structure.util.detached.DetachedEdge;
+import com.tinkerpop.gremlin.structure.util.detached.DetachedVertex;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * A @{link GraphReader} that constructs a graph from a JSON-based representation of a graph and its elements given
@@ -99,27 +100,24 @@ public class LegacyGraphSONReader implements GraphReader {
     }
 
     @Override
-    public Vertex readVertex(final InputStream inputStream,
-                             final STriFunction<Object, String, Object[], Vertex> vertexMaker) throws IOException {
-        throw new UnsupportedOperationException("This reader only reads an entire Graph");
-    }
-
-    @Override
-    public Vertex readVertex(final InputStream inputStream, final Direction direction,
-                             final STriFunction<Object, String, Object[], Vertex> vertexMaker,
-                             final SQuintFunction<Object, Object, Object, String, Object[], Edge> edgeMaker) throws IOException {
-        throw new UnsupportedOperationException("This reader only reads an entire Graph");
-    }
-
-    @Override
     public Iterator<Vertex> readVertices(final InputStream inputStream, final Direction direction,
-                                         final STriFunction<Object, String, Object[], Vertex> vertexMaker,
-                                         final SQuintFunction<Object, Object, Object, String, Object[], Edge> edgeMaker) throws IOException {
+                                         final Function<DetachedVertex, Vertex> vertexMaker,
+                                         final Function<DetachedEdge, Edge> edgeMaker) throws IOException {
         throw new UnsupportedOperationException("This reader only reads an entire Graph");
     }
 
     @Override
-    public Edge readEdge(final InputStream inputStream, final SQuintFunction<Object, Object, Object, String, Object[], Edge> edgeMaker) throws IOException {
+    public Edge readEdge(final InputStream inputStream, final Function<DetachedEdge, Edge> edgeMaker) throws IOException {
+        throw new UnsupportedOperationException("This reader only reads an entire Graph");
+    }
+
+    @Override
+    public Vertex readVertex(final InputStream inputStream, final Function<DetachedVertex, Vertex> vertexMaker) throws IOException {
+        throw new UnsupportedOperationException("This reader only reads an entire Graph");
+    }
+
+    @Override
+    public Vertex readVertex(final InputStream inputStream, final Direction direction, final Function<DetachedVertex, Vertex> vertexMaker, final Function<DetachedEdge, Edge> edgeMaker) throws IOException {
         throw new UnsupportedOperationException("This reader only reads an entire Graph");
     }
 
@@ -181,7 +179,7 @@ public class LegacyGraphSONReader implements GraphReader {
             final Map<String, Object> props = readProperties(json);
 
             final Object vertexId = getTypedValueFromJsonNode(json.get(GraphSONTokens._ID));
-            final Vertex v = g.addVertex(Element.ID, vertexId);
+            final Vertex v = g.addVertex(T.id, vertexId);
 
             for (Map.Entry<String, Object> entry : props.entrySet()) {
                 v.property(entry.getKey(), entry.getValue());
@@ -197,7 +195,7 @@ public class LegacyGraphSONReader implements GraphReader {
             final JsonNode nodeLabel = json.get(GraphSONTokens._LABEL);
             final String label = nodeLabel == null ? EMPTY_STRING : nodeLabel.textValue();
 
-            final Edge e = out.addEdge(label, in, Element.ID, edgeId);
+            final Edge e = out.addEdge(label, in, T.id, edgeId);
             for (Map.Entry<String, Object> entry : props.entrySet()) {
                 e.property(entry.getKey(), entry.getValue());
             }

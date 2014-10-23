@@ -10,14 +10,14 @@ import com.tinkerpop.gremlin.structure.Vertex;
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class EdgeVertexStep extends FlatMapStep<Edge, Vertex> implements Reversible {
+public final class EdgeVertexStep extends FlatMapStep<Edge, Vertex> implements Reversible {
 
-    protected Direction direction;
+    private Direction direction;
 
     public EdgeVertexStep(final Traversal traversal, final Direction direction) {
         super(traversal);
         this.direction = direction;
-        this.setFunction(traverser -> traverser.get().vertices(this.direction));
+        this.setFunction(traverser -> traverser.get().iterators().vertexIterator(this.direction));
     }
 
     public String toString() {

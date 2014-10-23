@@ -3,13 +3,11 @@ package com.tinkerpop.gremlin.process.graph.step.sideEffect;
 import com.tinkerpop.gremlin.process.SimpleTraverser;
 import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.process.Traverser;
-import com.tinkerpop.gremlin.process.graph.marker.Bulkable;
 import com.tinkerpop.gremlin.process.graph.marker.EngineDependent;
-import com.tinkerpop.gremlin.process.graph.marker.Reversible;
-import com.tinkerpop.gremlin.process.graph.marker.SideEffectCap;
 import com.tinkerpop.gremlin.process.util.AbstractStep;
 import com.tinkerpop.gremlin.process.util.FastNoSuchElementException;
 import com.tinkerpop.gremlin.process.util.TraversalHelper;
+import com.tinkerpop.gremlin.process.util.TraversalMetrics;
 import com.tinkerpop.gremlin.structure.Graph;
 
 import java.util.NoSuchElementException;
@@ -17,11 +15,11 @@ import java.util.NoSuchElementException;
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class SideEffectCapStep<S, E> extends AbstractStep<S, E> implements SideEffectCap, EngineDependent, Reversible, Bulkable {
+public final class SideEffectCapStep<S, E> extends AbstractStep<S, E> implements EngineDependent {
 
     private boolean done = false;
     private boolean onGraphComputer = false;
-    public String sideEffectKey;
+    private final String sideEffectKey;
 
     public SideEffectCapStep(final Traversal traversal, final String sideEffectKey) {
         super(traversal);
@@ -35,15 +33,20 @@ public class SideEffectCapStep<S, E> extends AbstractStep<S, E> implements SideE
 
     private Traverser<E> standardAlgorithm() {
         if (!this.done) {
-            Traverser<E> traverser = new SimpleTraverser<>((E) NO_OBJECT);
+            Traverser.Admin<E> traverser = new SimpleTraverser<>((E) NO_OBJECT, this.getTraversal().sideEffects());
             try {
                 while (true) {
-                    traverser = (Traverser<E>) this.starts.next();
+                    traverser = (Traverser.Admin<E>) this.starts.next();
                 }
             } catch (final NoSuchElementException ignored) {
             }
+
+            if (PROFILING_ENABLED) TraversalMetrics.start(this);
             this.done = true;
-            return traverser.makeChild(this.getLabel(), this.traversal.sideEffects().<E>get(this.sideEffectKey));
+            traverser.setBulk(1l);
+            final Traverser.Admin<E> returnTraverser = traverser.makeChild(this.getLabel(), traverser.sideEffects().<E>get(this.sideEffectKey));
+            if (PROFILING_ENABLED) TraversalMetrics.finish(this, traverser);
+            return returnTraverser;
         } else {
             throw FastNoSuchElementException.instance();
         }
@@ -59,18 +62,11 @@ public class SideEffectCapStep<S, E> extends AbstractStep<S, E> implements SideE
         this.onGraphComputer = engine.equals(Engine.COMPUTER);
     }
 
+    @Override
     public String toString() {
-        return Graph.Key.isHidden(this.sideEffectKey) ?
-                    super.toString() :
-                    TraversalHelper.makeStepString(this, this.sideEffectKey);
+        return Graph.System.isSystem(this.sideEffectKey) ? super.toString() : TraversalHelper.makeStepString(this, this.sideEffectKey);
     }
 
-    @Override
-    public void setCurrentBulkCount(final long bulkCount) {
-    }
-
-
-    @Override
     public String getSideEffectKey() {
         return this.sideEffectKey;
     }

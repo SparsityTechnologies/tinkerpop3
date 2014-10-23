@@ -56,10 +56,11 @@
         <module>gremlin-core</module>
         <module>gremlin-algorithm</module>
         <module>gremlin-test</module>
+        <module>gremlin-groovy</module>
+        <module>gremlin-groovy-test</module>
         <module>tinkergraph-gremlin</module>
         <module>neo4j-gremlin</module>
         <module>giraph-gremlin</module>
-        <module>gremlin-groovy</module>
         <module>gremlin-driver</module>
         <module>gremlin-console</module>
         <module>gremlin-server</module>
@@ -71,7 +72,7 @@
         <url>git@github.com:tinkerpop/tinkerpop3.git</url>
     </scm>
     <properties>
-        <groovy.version>2.3.6</groovy.version>
+        <groovy.version>2.3.7</groovy.version>
         <junit.version>4.11</junit.version>
         <kuali.s3.wagon.version>1.1.20</kuali.s3.wagon.version>
         <!-- Directory containing the file ${log4j.properties} defined
@@ -89,6 +90,7 @@
         <slf4j.version>1.7.7</slf4j.version>
         <javadoc-plugin.version>2.9.1</javadoc-plugin.version>
         <tinkerpop.version>3.0.0-SNAPSHOT</tinkerpop.version>
+        <muteTestLogs>false</muteTestLogs>
     </properties>
     <build>
         <directory>${basedir}/target</directory>
@@ -189,20 +191,6 @@
                     </archive>
                 </configuration>
             </plugin>
-            <!--<plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-gpg-plugin</artifactId>
-                <version>1.4</version>
-                <executions>
-                    <execution>
-                        <id>sign-artifacts</id>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>sign</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>-->
         </plugins>
         <pluginManagement>
             <plugins>
@@ -223,7 +211,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>2.16</version>
+                    <version>2.17</version>
                     <configuration>
                         <argLine>-Dlog4j.configuration=${log4j.properties}
                         </argLine>
@@ -663,24 +651,48 @@
                         <artifactId>maven-javadoc-plugin</artifactId>
                         <executions>
                             <execution>
-                                <id>aggregate-in-default-lifecycle</id>
+                                <id>aggregate-full-in-default-lifecycle</id>
                                 <goals>
                                     <goal>javadoc</goal>
                                 </goals>
                                 <phase>generate-sources</phase>
                                 <inherited>false</inherited>
                                 <configuration>
+                                    <destDir>full</destDir>
                                     <additionalparam>-Xdoclint:none</additionalparam>
                                     <sourcepath>
-                                        giraph-gremlin/src/main/java:gremlin-algorithm/src/main/java:gremlin-core/src/main/java:gremlin-driver/src/main/java:gremlin-groovy/src/main/java:gremlin-server/src/main/java:neo4j-gremlin/src/main/java:tinkergraph-gremlin/src/main/java
+                                        giraph-gremlin/src/main/java:gremlin-algorithm/src/main/java:gremlin-core/src/main/java:gremlin-driver/src/main/java:gremlin-groovy/src/main/java:gremlin-server/src/main/java:gremlin-test/src/main/java:neo4j-gremlin/src/main/java:tinkergraph-gremlin/src/main/java
                                     </sourcepath>
                                     <quiet>true</quiet>
-                                    <sourceFileExcludes>
-                                        <sourceFileExclude>com/tinkerpop/gremlin/server/channel/*.java</sourceFileExclude>
-                                        <sourceFileExclude>com/tinkerpop/gremlin/server/handler/*.java</sourceFileExclude>
-                                        <sourceFileExclude>com/tinkerpop/gremlin/server/op/*.java</sourceFileExclude>
-                                        <sourceFileExclude>com/tinkerpop/gremlin/server/util/*.java</sourceFileExclude>
-                                    </sourceFileExcludes>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>aggregate-core-in-default-lifecycle</id>
+                                <goals>
+                                    <goal>javadoc</goal>
+                                </goals>
+                                <phase>generate-sources</phase>
+                                <inherited>false</inherited>
+                                <configuration>
+                                    <destDir>core</destDir>
+                                    <additionalparam>-Xdoclint:none</additionalparam>
+                                    <sourcepath>
+                                        gremlin-core/src/main/java:gremlin-driver/src/main/java
+                                    </sourcepath>
+                                    <quiet>true</quiet>
+                                    <sourceFileIncludes>
+                                        <sourceFileInclude>com/tinkerpop/gremlin/structure/*.java</sourceFileInclude>
+                                        <sourceFileInclude>com/tinkerpop/gremlin/structure/io/*.java</sourceFileInclude>
+                                        <sourceFileInclude>com/tinkerpop/gremlin/structure/io/graphml/*.java</sourceFileInclude>
+                                        <sourceFileInclude>com/tinkerpop/gremlin/structure/io/graphson/*.java</sourceFileInclude>
+                                        <sourceFileInclude>com/tinkerpop/gremlin/structure/io/kryo/*.java</sourceFileInclude>
+                                        <sourceFileInclude>com/tinkerpop/gremlin/structure/strategy/*.java</sourceFileInclude>
+                                        <sourceFileInclude>com/tinkerpop/gremlin/process/*.java</sourceFileInclude>
+                                        <sourceFileInclude>com/tinkerpop/gremlin/process/computer/*.java</sourceFileInclude>
+                                        <sourceFileInclude>com/tinkerpop/gremlin/process/graph/*.java</sourceFileInclude>
+                                        <sourceFileInclude>com/tinkerpop/gremlin/process/util/*.java</sourceFileInclude>
+                                        <sourceFileInclude>com/tinkerpop/gremlin/driver/*.java</sourceFileInclude>
+                                    </sourceFileIncludes>
                                 </configuration>
                             </execution>
                         </executions>
@@ -705,6 +717,41 @@
                                 </configuration>
                             </execution>
                         </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <profile>
+            <id>travis</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+                <property>
+                    <name>travis</name>
+                </property>
+            </activation>
+
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <version>2.17</version>
+                        <configuration>
+                            <argLine>-Dlog4j.configuration=${log4j.properties}
+                            </argLine>
+                            <systemPropertyVariables>
+                                <muteTestLogs>true</muteTestLogs>
+                            </systemPropertyVariables>
+                            <additionalClasspathElements>
+                                <!-- So that Log4j can find the Log4j properties file -->
+                                <additionalClasspathElement>${log4j.properties.dir}</additionalClasspathElement>
+                            </additionalClasspathElements>
+                            <excludes>
+                                <exclude>**/*IntegrateTest.java</exclude>
+                                <exclude>**/*PerformanceTest.java</exclude>
+                            </excludes>
+                        </configuration>
                     </plugin>
                 </plugins>
             </build>

@@ -4,6 +4,7 @@ import com.tinkerpop.gremlin.AbstractGremlinTest;
 import com.tinkerpop.gremlin.LoadGraphWith;
 import com.tinkerpop.gremlin.process.T;
 import com.tinkerpop.gremlin.process.Traversal;
+import com.tinkerpop.gremlin.structure.Compare;
 import com.tinkerpop.gremlin.structure.Vertex;
 import org.junit.Test;
 
@@ -111,11 +112,11 @@ public abstract class WhereTest extends AbstractGremlinTest {
     }
 
 
-    public static class JavaWhereTest extends WhereTest {
+    public static class StandardTest extends WhereTest {
 
         @Override
         public Traversal<Vertex, Map<String, Object>> get_g_V_hasXageX_asXaX_out_in_hasXageX_asXbX_select_whereXa_eq_bX() {
-            return g.V().has("age").as("a").out().in().has("age").as("b").select().where("a", T.eq, "b");
+            return g.V().has("age").as("a").out().in().has("age").as("b").select().where("a", Compare.eq, "b");
         }
 
         @Override
@@ -136,11 +137,11 @@ public abstract class WhereTest extends AbstractGremlinTest {
 
     }
 
-    public static class JavaComputerWhereTest extends WhereTest {
+    public static class ComputerTest extends WhereTest {
 
         @Override
         public Traversal<Vertex, Map<String, Object>> get_g_V_hasXageX_asXaX_out_in_hasXageX_asXbX_select_whereXa_eq_bX() {
-            return g.V().has("age").as("a").out().in().has("age").as("b").select().where("a", T.eq, "b").submit(g.compute());
+            return g.V().has("age").as("a").out().in().has("age").as("b").select().where("a", Compare.eq, "b").submit(g.compute());
         }
 
         @Override
@@ -150,12 +151,12 @@ public abstract class WhereTest extends AbstractGremlinTest {
 
         @Override
         public Traversal<Vertex, Map<String, Object>> get_g_V_hasXageX_asXaX_out_in_hasXageX_asXbX_select_whereXb_hasXname_markoXX() {
-            return g.V().has("age").as("a").out().in().has("age").as("b").select().where(g.of().as("b").has("name", "marko")).submit(g.compute());
+            return g.V().has("age").as("a").out().in().has("age").as("b").select().where(g.of().as("b").has("name", "marko")); // TODO: internal traversals
         }
 
         @Override
         public Traversal<Vertex, Map<String, Object>> get_g_V_hasXageX_asXaX_out_in_hasXageX_asXbX_select_whereXa_outXknowsX_bX() {
-            return g.V().has("age").as("a").out().in().has("age").as("b").select().where(g.of().as("a").out("knows").as("b")).submit(g.compute());
+            return g.V().has("age").as("a").out().in().has("age").as("b").select().where(g.of().as("a").out("knows").as("b")); // TODO: internal traversals
         }
     }
 }

@@ -35,43 +35,21 @@ public class ExceptionCoverageTest {
                 Graph.Variables.Exceptions.class,
                 Property.Exceptions.class,
                 Transaction.Exceptions.class,
-                Vertex.Exceptions.class
+                Vertex.Exceptions.class,
+                VertexProperty.Exceptions.class
         };
 
         // this is a list of exceptions that are "excused" from the coverage tests.  in most cases there should only
         // be exceptions ignored if they are "base" exception methods that are used to compose other exceptions,
         // like the first set listed (and labelled as such) below in the list assignments.
         final Set<String> ignore = new HashSet<String>() {{
-            // these exceptions is not used directly...they are called by other exception methods.
-            add("com.tinkerpop.gremlin.structure.Property$Exceptions#propertyKeyIsReserved");
-            add("com.tinkerpop.gremlin.structure.Graph$Variables$Exceptions#memoryKeyIsReserved");
-
-            // this is a general exception to be used as needed.  it is not explicitly tested:
+            // this is a general exception to be used as needed. it is not explicitly tested:
             add("com.tinkerpop.gremlin.structure.Graph$Exceptions#argumentCanNotBeNull");
-
-            //add("com.tinkerpop.gremlin.structure.Graph$Exceptions#onlyOneOrNoGraphComputerClass");
-            //add("com.tinkerpop.gremlin.structure.Graph$Exceptions#graphDoesNotSupportProvidedGraphComputer");
 
             // todo: need to write consistency tests for the following items still...........
             add("com.tinkerpop.gremlin.process.computer.GraphComputer$Exceptions#adjacentElementPropertiesCanNotBeRead");
             add("com.tinkerpop.gremlin.process.computer.GraphComputer$Exceptions#adjacentElementPropertiesCanNotBeWritten");
-            add("com.tinkerpop.gremlin.process.computer.GraphComputer$Exceptions#constantComputeKeyHasAlreadyBeenSet");
             add("com.tinkerpop.gremlin.process.computer.GraphComputer$Exceptions#adjacentVerticesCanNotBeQueried");
-            add("com.tinkerpop.gremlin.process.computer.GraphComputer$Exceptions#isolationNotSupported");
-            add("com.tinkerpop.gremlin.process.computer.GraphComputer$Exceptions#providedKeyIsNotAComputeKey");
-            //add("com.tinkerpop.gremlin.process.computer.GraphComputer$Exceptions#computerHasAlreadyBeenSubmittedAVertexProgram");
-
-            add("com.tinkerpop.gremlin.structure.Graph$Exceptions#vertexAdditionsNotSupported");
-            add("com.tinkerpop.gremlin.structure.Element$Exceptions#propertyAdditionNotSupported");
-            add("com.tinkerpop.gremlin.structure.Vertex$Exceptions#edgeAdditionsNotSupported");
-
-            add("com.tinkerpop.gremlin.structure.Graph$Exceptions#vertexLookupsNotSupported");
-            add("com.tinkerpop.gremlin.structure.Graph$Exceptions#edgeLookupsNotSupported");
-
-            add("com.tinkerpop.gremlin.structure.Element$Exceptions#propertyRemovalNotSupported");
-            add("com.tinkerpop.gremlin.structure.Vertex$Exceptions#vertexRemovalNotSupported");
-            add("com.tinkerpop.gremlin.structure.Edge$Exceptions#edgeRemovalNotSupported");
-
         }};
 
         // register test classes here that contain @ExceptionCoverage annotations
@@ -84,6 +62,7 @@ public class ExceptionCoverageTest {
         testClassesThatContainConsistencyChecks.addAll(Arrays.asList(VariablesTest.class.getDeclaredClasses()));
         testClassesThatContainConsistencyChecks.add(TransactionTest.class);
         testClassesThatContainConsistencyChecks.add(VertexTest.class);
+        testClassesThatContainConsistencyChecks.add(VertexPropertyTest.class);
 
         // implemented exceptions are the classes that potentially contains exception consistency checks.
         final Set<String> implementedExceptions = testClassesThatContainConsistencyChecks.stream()

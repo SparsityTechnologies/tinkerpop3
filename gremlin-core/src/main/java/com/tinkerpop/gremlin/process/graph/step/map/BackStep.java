@@ -8,16 +8,16 @@ import com.tinkerpop.gremlin.process.util.TraversalHelper;
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public class BackStep<S, E> extends MapStep<S, E> implements PathConsumer, EngineDependent {
+public final class BackStep<S, E> extends MapStep<S, E> implements PathConsumer, EngineDependent {
 
-    public String stepLabel;
+    private final String stepLabel;
     private boolean requiresPaths = false;
 
     public BackStep(final Traversal traversal, final String stepLabel) {
         super(traversal);
         this.stepLabel = stepLabel;
         TraversalHelper.getStep(this.stepLabel, this.traversal);
-        this.setBiFunction((traverser, sideEffects) -> this.requiresPaths() ? traverser.getPath().get(this.stepLabel) : sideEffects.get(this.stepLabel));
+        this.setFunction(traverser -> this.requiresPaths() ? traverser.path().get(this.stepLabel) : traverser.get(this.stepLabel));
     }
 
     @Override
