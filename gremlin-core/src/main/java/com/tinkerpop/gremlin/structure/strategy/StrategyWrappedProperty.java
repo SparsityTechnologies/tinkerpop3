@@ -42,9 +42,9 @@ public class StrategyWrappedProperty<V> implements Property<V>, StrategyWrapped 
     }
 
     @Override
-    public <E extends Element> E element() {
+    public Element element() {
         final Element baseElement = this.baseProperty.element();
-        return (E) (baseElement instanceof Vertex ? new StrategyWrappedVertex((Vertex) baseElement, strategyWrappedGraph) :
+        return (baseElement instanceof Vertex ? new StrategyWrappedVertex((Vertex) baseElement, strategyWrappedGraph) :
                 new StrategyWrappedEdge((Edge) baseElement, strategyWrappedGraph));
     }
 
@@ -75,7 +75,7 @@ public class StrategyWrappedProperty<V> implements Property<V>, StrategyWrapped 
 
     @Override
     public void remove() {
-        this.strategyWrappedGraph.strategy().compose(
+        this.strategyWrappedGraph.getStrategy().compose(
                 s -> s.getRemovePropertyStrategy(strategyContext),
                 () -> {
                     this.baseProperty.remove();
@@ -85,7 +85,7 @@ public class StrategyWrappedProperty<V> implements Property<V>, StrategyWrapped 
 
     @Override
     public String toString() {
-        final GraphStrategy strategy = strategyWrappedGraph.strategy().getGraphStrategy().orElse(GraphStrategy.DefaultGraphStrategy.INSTANCE);
+        final GraphStrategy strategy = strategyWrappedGraph.getStrategy().getGraphStrategy().orElse(GraphStrategy.DefaultGraphStrategy.INSTANCE);
         return StringFactory.graphStrategyPropertyString(strategy, this.baseProperty);
     }
 }

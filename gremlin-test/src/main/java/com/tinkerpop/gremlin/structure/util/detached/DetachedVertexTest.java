@@ -56,6 +56,18 @@ public class DetachedVertexTest extends AbstractGremlinTest {
     }
 
     @Test
+    @FeatureRequirementSet(FeatureRequirementSet.Package.VERTICES_ONLY)
+    public void shouldConstructDetachedVertexAsReference() {
+        final Vertex v = g.addVertex("test", "123", Graph.Key.hide("test"), "321");
+        final DetachedVertex detachedVertex = DetachedVertex.detach(v, true);
+
+        assertEquals(v.id(), detachedVertex.id());
+        assertEquals(v.label(), detachedVertex.label());
+        assertEquals(0, StreamFactory.stream(detachedVertex.iterators().propertyIterator()).count());
+        assertEquals(0, StreamFactory.stream(detachedVertex.iterators().hiddenPropertyIterator()).count());
+    }
+
+    @Test
     @LoadGraphWith(LoadGraphWith.GraphData.CREW)
     public void shouldDetachVertexWithMultiPropertiesAndMetaProperties() {
         final DetachedVertex v1 = DetachedVertex.detach(convertToVertex(g, "marko"));
@@ -102,10 +114,11 @@ public class DetachedVertexTest extends AbstractGremlinTest {
     @Test
     @LoadGraphWith(LoadGraphWith.GraphData.MODERN)
     @FeatureRequirementSet(FeatureRequirementSet.Package.SIMPLE)
-    @FeatureRequirement(featureClass = Graph.Features.EdgePropertyFeatures.class, feature = Graph.Features.EdgePropertyFeatures.FEATURE_DOUBLE_VALUES)
+    @FeatureRequirement(featureClass = Graph.Features.EdgePropertyFeatures.class, feature = Graph.Features.EdgePropertyFeatures.FEATURE_INTEGER_VALUES)
     public void shouldNotEvaluateToEqualDifferentId() {
-        final Vertex v = g.addVertex("name", "marko", "age", 29);
-        assertFalse(DetachedVertex.detach(v).equals(DetachedVertex.detach(g.v(convertToVertexId("marko")))));
+        final DetachedVertex originalMarko = DetachedVertex.detach(g.v(convertToVertexId("marko")));
+        final Vertex secondMarko = g.addVertex("name", "marko", "age", 29);
+        assertFalse(DetachedVertex.detach(secondMarko).equals(originalMarko));
     }
 
     @Test

@@ -10,7 +10,6 @@ import com.tinkerpop.gremlin.structure.Graph.Features.PropertyFeatures;
 import com.tinkerpop.gremlin.structure.Graph.Features.VertexPropertyFeatures;
 import com.tinkerpop.gremlin.structure.util.StringFactory;
 import com.tinkerpop.gremlin.util.StreamFactory;
-import com.tinkerpop.gremlin.util.function.TriFunction;
 import org.javatuples.Pair;
 import org.junit.Test;
 import org.junit.experimental.runners.Enclosed;
@@ -37,6 +36,7 @@ import static org.junit.Assume.assumeThat;
  * @author Stephen Mallette (http://stephen.genoprime.com)
  */
 @RunWith(Enclosed.class)
+@SuppressWarnings("ThrowableResultOfMethodCallIgnored")
 public class PropertyTest {
 
     /**
@@ -122,17 +122,17 @@ public class PropertyTest {
             final Vertex v = g.addVertex("name", "marko", Graph.Key.hide("acl"), "rw", Graph.Key.hide("other"), "rw");
             tryCommit(g);
             final Vertex v1 = g.v(v.id());
-            v1.hiddenKeys().stream().forEach(hiddenKey -> assertTrue(v1.hiddenValue(hiddenKey).hasNext()));
-            assertFalse(v1.hiddenValue(Graph.Key.hide("other")).hasNext());
-            assertTrue(v1.hiddenValue("other").hasNext());
+            v1.hiddenKeys().stream().forEach(hiddenKey -> assertTrue(v1.hiddenValues(hiddenKey).hasNext()));
+            assertFalse(v1.hiddenValues(Graph.Key.hide("other")).hasNext());
+            assertTrue(v1.hiddenValues("other").hasNext());
 
             final Vertex u = g.addVertex();
             Edge e = v1.addEdge("knows", u, Graph.Key.hide("acl"), "private", "acl", "public");
             tryCommit(g);
             final Edge e1 = g.e(e.id());
-            e1.hiddenKeys().stream().forEach(hiddenKey -> assertTrue(e1.hiddenValue(hiddenKey).hasNext()));
-            assertFalse(e1.hiddenValue(Graph.Key.hide("acl")).hasNext());
-            assertTrue(e1.hiddenValue("acl").hasNext());
+            e1.hiddenKeys().stream().forEach(hiddenKey -> assertTrue(e1.hiddenValues(hiddenKey).hasNext()));
+            assertFalse(e1.hiddenValues(Graph.Key.hide("acl")).hasNext());
+            assertTrue(e1.hiddenValues("acl").hasNext());
             assertEquals("private", e1.iterators().hiddenPropertyIterator("acl").next().value());
             assertEquals("public", e1.iterators().propertyIterator("acl").next().value());
         }
@@ -178,8 +178,7 @@ public class PropertyTest {
                 this.g.addVertex(arguments);
                 fail(String.format("Call to addVertex should have thrown an exception with these arguments [%s]", arguments));
             } catch (Exception ex) {
-                assertEquals(expectedException.getClass(), ex.getClass());
-                assertEquals(expectedException.getMessage(), ex.getMessage());
+                validateException(expectedException, ex);
             }
         }
 
@@ -193,8 +192,7 @@ public class PropertyTest {
                 v.addEdge("label", v, arguments);
                 fail(String.format("Call to addVertex should have thrown an exception with these arguments [%s]", arguments));
             } catch (Exception ex) {
-                assertEquals(expectedException.getClass(), ex.getClass());
-                assertEquals(expectedException.getMessage(), ex.getMessage());
+                validateException(expectedException, ex);
             }
         }
     }
@@ -215,9 +213,7 @@ public class PropertyTest {
                 v.value("does-not-exist");
                 fail("Call to Element.value() with a key that is not present should throw an exception");
             } catch (Exception ex) {
-                final Exception expectedException = Property.Exceptions.propertyDoesNotExist("does-not-exist");
-                assertEquals(expectedException.getClass(), ex.getClass());
-                assertEquals(expectedException.getMessage(), ex.getMessage());
+                validateException(Property.Exceptions.propertyDoesNotExist("does-not-exist"), ex);
             }
 
         }
@@ -233,9 +229,7 @@ public class PropertyTest {
                 e.value("does-not-exist");
                 fail("Call to Element.value() with a key that is not present should throw an exception");
             } catch (Exception ex) {
-                final Exception expectedException = Property.Exceptions.propertyDoesNotExist("does-not-exist");
-                assertEquals(expectedException.getClass(), ex.getClass());
-                assertEquals(expectedException.getMessage(), ex.getMessage());
+                validateException(Property.Exceptions.propertyDoesNotExist("does-not-exist"), ex);
             }
 
         }
@@ -283,8 +277,7 @@ public class PropertyTest {
                 v.property(key, val);
                 fail(String.format("Call to Vertex.setProperty should have thrown an exception with these arguments [%s, %s]", key, val));
             } catch (Exception ex) {
-                assertEquals(expectedException.getClass(), ex.getClass());
-                assertEquals(expectedException.getMessage(), ex.getMessage());
+                validateException(expectedException, ex);
             }
         }
 
@@ -299,8 +292,7 @@ public class PropertyTest {
                 v.addEdge("label", v).property(key, val);
                 fail(String.format("Call to Edge.setProperty should have thrown an exception with these arguments [%s, %s]", key, val));
             } catch (Exception ex) {
-                assertEquals(expectedException.getClass(), ex.getClass());
-                assertEquals(expectedException.getMessage(), ex.getMessage());
+                validateException(expectedException, ex);
             }
         }
     }
@@ -378,26 +370,28 @@ public class PropertyTest {
      */
     @RunWith(Parameterized.class)
     public static class PropertyFeatureSupportTest extends AbstractGremlinTest {
-        private static final Map<String, Object> testMap = new HashMap<String, Object>() {{
-            put("testString", "try");
-            put("testInteger", 123);
-        }};
+        private static final Map<String,Object> testMap = new HashMap<>();
 
-        private static final ArrayList<Object> mixedList = new ArrayList<Object>() {{
-            add("try1");
-            add(2);
-        }};
+        private static final ArrayList<Object> mixedList = new ArrayList<>();
 
-        private static final ArrayList<String> uniformStringList = new ArrayList<String>() {{
-            add("try1");
-            add("try2");
-        }};
+        private static final ArrayList<String> uniformStringList = new ArrayList<>();
 
-        private static final ArrayList<Integer> uniformIntegerList = new ArrayList<Integer>() {{
-            add(100);
-            add(200);
-            add(300);
-        }};
+        private static final ArrayList<Integer> uniformIntegerList = new ArrayList<>();
+
+        static {
+            testMap.put("testString", "try");
+            testMap.put("testInteger", 123);
+
+            mixedList.add("try1");
+            mixedList.add(2);
+
+            uniformStringList.add("try1");
+            uniformStringList.add("try2");
+
+            uniformIntegerList.add(100);
+            uniformIntegerList.add(200);
+            uniformIntegerList.add(300);
+        }
 
         @Parameterized.Parameters(name = "{index}: supports{0}({1})")
         public static Iterable<Object[]> data() {
@@ -566,33 +560,6 @@ public class PropertyTest {
             final Vertex vertexA = g.addVertex();
             final Vertex vertexB = g.addVertex();
             return vertexA.addEdge(GraphManager.get().convertLabel("knows"), vertexB, k, v);
-        }
-    }
-
-    private static class MockSerializable implements Serializable {
-        private String testField;
-
-        public MockSerializable(final String testField) {
-            this.testField = testField;
-        }
-
-        public String getTestField() {
-            return this.testField;
-        }
-
-        public void setTestField(final String testField) {
-            this.testField = testField;
-        }
-
-        @Override
-        public boolean equals(Object oth) {
-            if (this == oth) return true;
-            else if (oth == null) return false;
-            else if (!getClass().isInstance(oth)) return false;
-            MockSerializable m = (MockSerializable) oth;
-            if (testField == null) {
-                return (m.testField == null);
-            } else return testField.equals(m.testField);
         }
     }
 }

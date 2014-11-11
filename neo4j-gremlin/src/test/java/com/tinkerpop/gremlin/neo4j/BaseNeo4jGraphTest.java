@@ -1,6 +1,5 @@
 package com.tinkerpop.gremlin.neo4j;
 
-import com.tinkerpop.gremlin.groovy.loaders.SugarLoader;
 import com.tinkerpop.gremlin.neo4j.structure.Neo4jGraph;
 import org.apache.commons.configuration.Configuration;
 import org.junit.After;

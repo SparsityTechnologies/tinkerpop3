@@ -16,22 +16,22 @@ import static com.tinkerpop.gremlin.LoadGraphWith.GraphData.MODERN;
  */
 public abstract class UntilTest extends AbstractGremlinProcessTest {
 
-    public abstract Traversal<Vertex, String> get_g_v1_untilXa_loops_gt_1X_out_asXaX_valueXnameX(final Object v1Id);
+    public abstract Traversal<Vertex, String> get_g_v1_untilXa_loops_gt_1X_out_asXaX_name(final Object v1Id);
 
-    public abstract Traversal<Vertex, String> get_g_v1_untilXa_1X_out_asXaX_valueXnameX(final Object v1Id);
+    public abstract Traversal<Vertex, String> get_g_v1_untilXa_1X_out_asXaX_name(final Object v1Id);
 
     public abstract Traversal<Vertex, Long> get_g_V_untilXa_loops_gt_1X_out_asXaX_count();
 
     public abstract Traversal<Vertex, Long> get_g_V_untilXa_1X_out_asXaX_count();
 
-    public abstract Traversal<Vertex, String> get_g_V_untilXa_1_trueX_out_asXaX_valueXnameX();
+    public abstract Traversal<Vertex, String> get_g_V_untilXa_1_trueX_out_asXaX_name();
 
     @Test
     @LoadGraphWith(MODERN)
     public void g_v1_untilXa_loops_gt_1X_out_asXaX_valueXnameX() {
         final List<Traversal<Vertex, String>> traversals = Arrays.asList(
-                get_g_v1_untilXa_loops_gt_1X_out_asXaX_valueXnameX(convertToVertexId("marko")),
-                get_g_v1_untilXa_1X_out_asXaX_valueXnameX(convertToVertexId("marko")));
+                get_g_v1_untilXa_loops_gt_1X_out_asXaX_name(convertToVertexId("marko")),
+                get_g_v1_untilXa_1X_out_asXaX_name(convertToVertexId("marko")));
         traversals.forEach(traversal -> {
             printTraversalForm(traversal);
             checkResults(Arrays.asList("lop", "ripple"), traversal);
@@ -53,7 +53,7 @@ public abstract class UntilTest extends AbstractGremlinProcessTest {
     /*@Test
     @LoadGraphWith(MODERN)
     public void g_V_untilXa_1_trueX_out_asXaX_valueXnameX() {
-        final List<Traversal<Vertex, String>> traversals = Arrays.asList(get_g_V_untilXa_1_trueX_out_asXaX_valueXnameX());
+        final List<Traversal<Vertex, String>> traversals = Arrays.asList(get_g_V_untilXa_1_trueX_out_asXaX_name());
         traversals.forEach(traversal -> {
             printTraversalForm(traversal);
             checkResults(new HashMap<String, Long>() {{
@@ -70,12 +70,12 @@ public abstract class UntilTest extends AbstractGremlinProcessTest {
             requiresGraphComputer = false;
         }
 
-        public Traversal<Vertex, String> get_g_v1_untilXa_loops_gt_1X_out_asXaX_valueXnameX(final Object v1Id) {
-            return g.v(v1Id).until("a", v -> v.loops() > 1).out().as("a").value("name");
+        public Traversal<Vertex, String> get_g_v1_untilXa_loops_gt_1X_out_asXaX_name(final Object v1Id) {
+            return g.v(v1Id).until("a", v -> v.loops() > 1).out().as("a").values("name");
         }
 
-        public Traversal<Vertex, String> get_g_v1_untilXa_1X_out_asXaX_valueXnameX(final Object v1Id) {
-            return g.v(v1Id).until("a", 1).out().as("a").value("name");
+        public Traversal<Vertex, String> get_g_v1_untilXa_1X_out_asXaX_name(final Object v1Id) {
+            return g.v(v1Id).until("a", 1).out().as("a").values("name");
         }
 
         public Traversal<Vertex, Long> get_g_V_untilXa_loops_gt_1X_out_asXaX_count() {
@@ -86,8 +86,8 @@ public abstract class UntilTest extends AbstractGremlinProcessTest {
             return g.V().until("a", 1).out().as("a").count();
         }
 
-        public Traversal<Vertex, String> get_g_V_untilXa_1_trueX_out_asXaX_valueXnameX() {
-            return g.V().until("a", 1, v -> true).out().as("a").value("name");
+        public Traversal<Vertex, String> get_g_V_untilXa_1_trueX_out_asXaX_name() {
+            return g.V().until("a", 1, v -> true).out().as("a").values("name");
         }
     }
 
@@ -96,12 +96,12 @@ public abstract class UntilTest extends AbstractGremlinProcessTest {
             requiresGraphComputer = true;
         }
 
-        public Traversal<Vertex, String> get_g_v1_untilXa_loops_gt_1X_out_asXaX_valueXnameX(final Object v1Id) {
-            return g.v(v1Id).until("a", v -> v.loops() > 1).out().as("a").<String>value("name").submit(g.compute());
+        public Traversal<Vertex, String> get_g_v1_untilXa_loops_gt_1X_out_asXaX_name(final Object v1Id) {
+            return g.v(v1Id).until("a", v -> v.loops() > 1).out().as("a").<String>values("name").submit(g.compute());
         }
 
-        public Traversal<Vertex, String> get_g_v1_untilXa_1X_out_asXaX_valueXnameX(final Object v1Id) {
-            return g.v(v1Id).until("a", 1).out().as("a").<String>value("name").submit(g.compute());
+        public Traversal<Vertex, String> get_g_v1_untilXa_1X_out_asXaX_name(final Object v1Id) {
+            return g.v(v1Id).until("a", 1).out().as("a").<String>values("name").submit(g.compute());
         }
 
         public Traversal<Vertex, Long> get_g_V_untilXa_loops_gt_1X_out_asXaX_count() {
@@ -112,8 +112,8 @@ public abstract class UntilTest extends AbstractGremlinProcessTest {
             return g.V().until("a", 1).out().as("a").count().submit(g.compute());
         }
 
-        public Traversal<Vertex, String> get_g_V_untilXa_1_trueX_out_asXaX_valueXnameX() {
-            return g.V().until("a", 1, v -> true).out().as("a").<String>value("name").submit(g.compute());
+        public Traversal<Vertex, String> get_g_V_untilXa_1_trueX_out_asXaX_name() {
+            return g.V().until("a", 1, v -> true).out().as("a").<String>values("name").submit(g.compute());
         }
     }
 }

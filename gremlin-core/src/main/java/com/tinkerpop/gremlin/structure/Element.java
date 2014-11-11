@@ -15,6 +15,7 @@ import java.util.Set;
  * etc.)
  *
  * @author Marko A. Rodriguez (http://markorodriguez.com)
+ * @author Stephen Mallette (http://stephen.genoprime.com)
  */
 public abstract interface Element {
 
@@ -98,22 +99,53 @@ public abstract interface Element {
      */
     public void remove();
 
+    /**
+     * Gets the iterators for the {@code Element}.  Iterators provide low-level access to the data associated with
+     * an {@code Element} as they do not come with the overhead of {@link com.tinkerpop.gremlin.process.Traversal}
+     * construction.  Use iterators in places where performance is most crucial.
+     */
     public Element.Iterators iterators();
 
+    /**
+     * An interface that provides access to iterators over properties of an {@code Element}, without constructing a
+     * {@link com.tinkerpop.gremlin.process.Traversal} object.
+     */
     public interface Iterators {
 
         /**
          * Get the values of non-hidden properties as a {@link Map} of keys and values.
          */
         public default <V> Iterator<V> valueIterator(final String... propertyKeys) {
-            return StreamFactory.stream(this.propertyIterator(propertyKeys)).map(property -> (V) property.value()).iterator();
+            final Iterator<? extends Property<V>> iterator = this.propertyIterator(propertyKeys);
+            return new Iterator<V>() {
+                @Override
+                public boolean hasNext() {
+                    return iterator.hasNext();
+                }
+
+                @Override
+                public V next() {
+                    return iterator.next().value();
+                }
+            };
         }
 
         /**
          * Get the values of hidden properties as a {@link Map} of keys and values.
          */
         public default <V> Iterator<V> hiddenValueIterator(final String... propertyKeys) {
-            return StreamFactory.stream(this.hiddenPropertyIterator(propertyKeys)).map(property -> (V) property.value()).iterator();
+            final Iterator<? extends Property<V>> iterator = this.hiddenPropertyIterator(propertyKeys);
+            return new Iterator<V>() {
+                @Override
+                public boolean hasNext() {
+                    return iterator.hasNext();
+                }
+
+                @Override
+                public V next() {
+                    return iterator.next().value();
+                }
+            };
         }
 
         /**
@@ -158,6 +190,10 @@ public abstract interface Element {
 
         public static IllegalArgumentException labelCanNotBeASystemKey(final String label) {
             return new IllegalArgumentException("Label can not be a system key: " + label);
+        }
+
+        public static IllegalStateException elementAlreadyRemoved(final Class<? extends Element> clazz, final Object id) {
+            return new IllegalStateException(String.format("%s with id %s was removed.", clazz.getSimpleName(), id));
         }
     }
 }

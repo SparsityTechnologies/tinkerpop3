@@ -21,6 +21,7 @@ import java.util.stream.Stream;
 public abstract class Neo4jElement implements Element, Element.Iterators, WrappedElement<PropertyContainer> {
     protected final Neo4jGraph graph;
     protected PropertyContainer baseElement;
+    protected boolean removed = false;
 
     public Neo4jElement(final Neo4jGraph graph) {
         this.graph = graph;
@@ -71,7 +72,7 @@ public abstract class Neo4jElement implements Element, Element.Iterators, Wrappe
             else
                 return Property.empty();
         } catch (IllegalStateException ise) {
-            return Property.<V>empty();
+            throw Element.Exceptions.elementAlreadyRemoved(this.getClass(), this.id());
         }
     }
 

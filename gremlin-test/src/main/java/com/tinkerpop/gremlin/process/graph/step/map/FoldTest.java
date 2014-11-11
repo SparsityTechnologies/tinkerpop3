@@ -1,7 +1,7 @@
 package com.tinkerpop.gremlin.process.graph.step.map;
 
-import com.tinkerpop.gremlin.AbstractGremlinTest;
 import com.tinkerpop.gremlin.LoadGraphWith;
+import com.tinkerpop.gremlin.process.AbstractGremlinProcessTest;
 import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.structure.Vertex;
 import org.junit.Test;
@@ -17,13 +17,13 @@ import static org.junit.Assert.assertFalse;
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
-public abstract class FoldTest extends AbstractGremlinTest {
+public abstract class FoldTest extends AbstractGremlinProcessTest {
 
     public abstract Traversal<Vertex, List<Vertex>> get_g_V_fold();
 
     public abstract Traversal<Vertex, Vertex> get_g_V_fold_unfold();
 
-    public abstract Traversal<Vertex, Integer> get_g_V_hasXageX_foldX0_plusX();
+    public abstract Traversal<Vertex, Integer> get_g_V_age_foldX0_plusX();
 
     @Test
     @LoadGraphWith(MODERN)
@@ -55,7 +55,7 @@ public abstract class FoldTest extends AbstractGremlinTest {
     @Test
     @LoadGraphWith(MODERN)
     public void g_V_hasXageX_foldX0_plusX() {
-        final Traversal<Vertex, Integer> traversal = get_g_V_hasXageX_foldX0_plusX();
+        final Traversal<Vertex, Integer> traversal = get_g_V_age_foldX0_plusX();
         printTraversalForm(traversal);
         final Integer ageSum = traversal.next();
         assertFalse(traversal.hasNext());
@@ -75,8 +75,30 @@ public abstract class FoldTest extends AbstractGremlinTest {
         }
 
         @Override
-        public Traversal<Vertex, Integer> get_g_V_hasXageX_foldX0_plusX() {
-            return g.V().<Vertex>has("age").fold(0, (seed, v) -> seed + v.get().<Integer>value("age"));
+        public Traversal<Vertex, Integer> get_g_V_age_foldX0_plusX() {
+            return g.V().<Integer>values("age").fold(0, (seed, age) -> seed + age.get());
+        }
+    }
+
+    public static class ComputerTest extends FoldTest {
+
+        public ComputerTest() {
+            requiresGraphComputer = true;
+        }
+
+        @Override
+        public Traversal<Vertex, List<Vertex>> get_g_V_fold() {
+            return g.V().fold().submit(g.compute());
+        }
+
+        @Override
+        public Traversal<Vertex, Vertex> get_g_V_fold_unfold() {
+            return (Traversal) g.V().fold().unfold().submit(g.compute());
+        }
+
+        @Override
+        public Traversal<Vertex, Integer> get_g_V_age_foldX0_plusX() {
+            return g.V().<Integer>values("age").fold(0, (seed, age) -> seed + age.get()).submit(g.compute());
         }
     }
 }

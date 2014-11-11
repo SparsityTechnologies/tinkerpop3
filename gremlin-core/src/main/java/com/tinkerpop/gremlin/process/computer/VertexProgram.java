@@ -5,13 +5,18 @@ import org.apache.commons.configuration.Configuration;
 
 import java.lang.reflect.Constructor;
 import java.util.Collections;
-import java.util.Optional;
 import java.util.Set;
 
 /**
- * A {@link VertexProgram} represents one component of a distributed graph computation. Each applicable vertex
- * (theoretically) maintains a {@link VertexProgram} instance. The collective behavior of all instances yields
- * the computational result.
+ * A {@link VertexProgram} represents one component of a distributed graph computation. Each vertex in the graph
+ * (logically) executes the {@link VertexProgram} instance in parallel. The collective behavior yields
+ * the computational result. In practice, a "worker" (i.e. task, thread, etc.) is responsible for executing the
+ * VertexProgram against each vertex that it has in its vertex set (a subset of the full graph vertex set).
+ * At minimum there is one "worker" for each vertex, though this is impractical in practice and {@link GraphComputer}
+ * implementations that leverage such a design are not expected to perform well due to the excess object creation.
+ * Any local state/fields in a VertexProgram is static to the vertices within the same worker set.
+ * It is not safe to assume that the VertexProgram's "worker" state will remain stable between iterations.
+ * Hence, the existence of {@link VertexProgram#workerIterationStart} and {@link VertexProgram#workerIterationEnd}.
  *
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  * @author Matthias Broecheler (me@matthiasb.com)
@@ -25,7 +30,7 @@ public interface VertexProgram<M> {
      * This is typically required when the VertexProgram needs to be serialized to another machine.
      * Note that what is stored is simply the instance/configuration state, not any processed data.
      * The default implementation provided simply stores the VertexProgram class name for reflective reconstruction.
-     * It is typically a good idea to super.storeState().
+     * It is typically a good idea to VertexProgram.super.storeState().
      *
      * @param configuration the configuration to store the state of the VertexProgram in.
      */
@@ -37,6 +42,8 @@ public interface VertexProgram<M> {
      * When it is necessary to load the state of the VertexProgram, this method is called.
      * This is typically required when the VertexProgram needs to be serialized to another machine.
      * Note that what is loaded is simply the instance state, not any processed data.
+     * It is possible for this method to be called for each and every vertex in the graph.
+     * Thus, it is important to only store/load that state which is needed during execution in order to reduce startup time.
      *
      * @param configuration the configuration to load the state of the VertexProgram from.
      */
@@ -76,6 +83,32 @@ public interface VertexProgram<M> {
     public boolean terminate(final Memory memory);
 
     /**
+     * This method is called at the start of each iteration of each "computational chunk."
+     * The set of vertices in the graph are typically not processed with full parallelism.
+     * The vertex set is split into subsets and a worker is assigned to call the {@link VertexProgram#execute} method.
+     * The typical use is to create static VertexProgram state that exists for the iteration of the vertex subset.
+     * The default implementation is a no-op.
+     *
+     * @param memory The memory at the start of the iteration.
+     */
+    public default void workerIterationStart(final Memory memory) {
+
+    }
+
+    /**
+     * This method is called at the end of each iteration of each "computational chunk."
+     * The set of vertices in the graph are typically not processed with full parallelism.
+     * The vertex set is split into subsets and a worker is assigned to call the {@link VertexProgram#execute} method.
+     * The typical use is to destroy static VertexProgram state that existed during the iteration of the vertex subset.
+     * The default implementation is a no-op.
+     *
+     * @param memory The memory at the start of the iteration.
+     */
+    public default void workerIterationEnd(final Memory memory) {
+
+    }
+
+    /**
      * The {@link com.tinkerpop.gremlin.structure.Element} properties that will be mutated during the computation.
      * All properties in the graph are readable, but only the keys specified here are writable.
      * The default is an empty set.
@@ -97,12 +130,11 @@ public interface VertexProgram<M> {
         return Collections.emptySet();
     }
 
-    /**
+    /*
      * DO NOT USE YET.
-     */
     public default Optional<MessageCombiner<M>> getMessageCombiner() {
         return Optional.empty();
-    }
+    }*/
 
     /**
      * The set of {@link MapReduce} jobs that are associated with the {@link VertexProgram}.

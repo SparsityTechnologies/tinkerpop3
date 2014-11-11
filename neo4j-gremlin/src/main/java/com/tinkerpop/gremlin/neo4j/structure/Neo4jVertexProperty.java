@@ -1,7 +1,11 @@
 package com.tinkerpop.gremlin.neo4j.structure;
 
+import com.tinkerpop.gremlin.neo4j.process.graph.Neo4jTraversal;
 import com.tinkerpop.gremlin.neo4j.process.graph.Neo4jVertexPropertyTraversal;
+import com.tinkerpop.gremlin.neo4j.process.graph.util.Neo4jGraphTraversal;
 import com.tinkerpop.gremlin.process.T;
+import com.tinkerpop.gremlin.process.graph.step.sideEffect.StartStep;
+import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
@@ -15,6 +19,7 @@ import org.neo4j.graphdb.DynamicLabel;
 import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.Label;
 import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.NotFoundException;
 import org.neo4j.graphdb.Relationship;
 
 import java.util.Collections;
@@ -52,6 +57,12 @@ public class Neo4jVertexProperty<V> implements VertexProperty<V>, VertexProperty
         this.node = node;
         this.key = (String) node.getProperty(T.key.getAccessor());
         this.value = (V) node.getProperty(T.value.getAccessor());
+    }
+
+    @Override
+    public Neo4jTraversal<VertexProperty, VertexProperty> start() {
+        final Neo4jTraversal<VertexProperty, VertexProperty> traversal = new Neo4jGraphTraversal<>(this.vertex.graph);
+        return (Neo4jTraversal) traversal.addStep(new StartStep<>(traversal, this));
     }
 
     @Override
@@ -112,8 +123,8 @@ public class Neo4jVertexProperty<V> implements VertexProperty<V>, VertexProperty
                 return new Neo4jProperty<>(this, key, (U) this.node.getProperty(key));
             else
                 return Property.empty();
-        } catch (IllegalStateException ise) {
-            return Property.<U>empty();
+        } catch (IllegalStateException | NotFoundException ex) {
+            throw Element.Exceptions.elementAlreadyRemoved(this.getClass(), this.id());
         }
     }
 

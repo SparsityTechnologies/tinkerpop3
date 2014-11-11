@@ -42,9 +42,9 @@ public class MutablePath implements Path, Serializable, Cloneable {
     @Override
     public Path extend(final String label, final Object object) {
         this.objects.add(object);
-        this.labels.add(new HashSet<String>() {{
-            add(label);
-        }});
+        final HashSet<String> temp = new HashSet<>();
+        temp.add(label);
+        this.labels.add(temp);
         return this;
     }
 
@@ -53,16 +53,6 @@ public class MutablePath implements Path, Serializable, Cloneable {
         this.objects.add(object);
         this.labels.add(new HashSet<>(labels));
         return this;
-    }
-
-    @Override
-    public <A> A get(final String label) {
-        for (int i = 0; i < this.objects.size(); i++) {
-            if (this.labels.get(i).contains(label)) {
-                return (A) this.objects.get(i);
-            }
-        }
-        throw Path.Exceptions.stepWithProvidedLabelDoesNotExist(label);
     }
 
     @Override

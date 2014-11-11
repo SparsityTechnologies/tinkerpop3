@@ -2,16 +2,12 @@ package com.tinkerpop.gremlin.neo4j;
 
 import com.tinkerpop.gremlin.AbstractGraphProvider;
 import com.tinkerpop.gremlin.LoadGraphWith;
-import com.tinkerpop.gremlin.neo4j.process.graph.step.sideEffect.Neo4jGraphStep;
 import com.tinkerpop.gremlin.neo4j.structure.Neo4jGraph;
-import com.tinkerpop.gremlin.process.graph.step.sideEffect.GraphStep;
 import com.tinkerpop.gremlin.structure.Graph;
 import org.apache.commons.configuration.Configuration;
 import org.neo4j.graphdb.DynamicLabel;
 
 import java.io.File;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Random;
 
 /**
@@ -36,11 +32,11 @@ public abstract class AbstractNeo4jGraphProvider extends AbstractGraphProvider {
 
     @Override
     public void loadGraphData(final Graph g, final LoadGraphWith loadGraphWith) {
-        this.loadGraphData((Neo4jGraph) g, loadGraphWith.value());
+        this.createIndices((Neo4jGraph) g, loadGraphWith.value());
         super.loadGraphData(g, loadGraphWith);
     }
 
-    private void loadGraphData(final Neo4jGraph g, final LoadGraphWith.GraphData graphData) {
+    private void createIndices(final Neo4jGraph g, final LoadGraphWith.GraphData graphData) {
         final Random random = new Random();
         final int pick = random.nextInt(3);
         //final int pick = 2;

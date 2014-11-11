@@ -246,12 +246,12 @@ public class SequenceGraphStrategy implements GraphStrategy {
     }
 
     @Override
-    public UnaryOperator<TriFunction<Direction, Integer, String[], Iterator<Vertex>>> getVertexIteratorsVerticesStrategy(final Strategy.Context<StrategyWrappedVertex> ctx) {
+    public UnaryOperator<BiFunction<Direction, String[], Iterator<Vertex>>> getVertexIteratorsVerticesStrategy(final Strategy.Context<StrategyWrappedVertex> ctx) {
         return this.composeStrategyUnaryOperator(s -> s.getVertexIteratorsVerticesStrategy(ctx));
     }
 
     @Override
-    public UnaryOperator<TriFunction<Direction, Integer, String[], Iterator<Edge>>> getVertexIteratorsEdgesStrategy(final Strategy.Context<StrategyWrappedVertex> ctx) {
+    public UnaryOperator<BiFunction<Direction, String[], Iterator<Edge>>> getVertexIteratorsEdgesStrategy(final Strategy.Context<StrategyWrappedVertex> ctx) {
         return this.composeStrategyUnaryOperator(s -> s.getVertexIteratorsEdgesStrategy(ctx));
     }
 
@@ -303,6 +303,21 @@ public class SequenceGraphStrategy implements GraphStrategy {
     @Override
     public <V> UnaryOperator<Supplier<Vertex>> getVertexPropertyGetElementStrategy(final Strategy.Context<StrategyWrappedVertexProperty<V>> ctx) {
         return this.composeStrategyUnaryOperator(s -> s.getVertexPropertyGetElementStrategy(ctx));
+    }
+
+    @Override
+    public UnaryOperator<Supplier<GraphTraversal<Vertex, Vertex>>> getGraphVStrategy(final Strategy.Context<StrategyWrappedGraph> ctx) {
+        return this.composeStrategyUnaryOperator(s -> s.getGraphVStrategy(ctx));
+    }
+
+    @Override
+    public UnaryOperator<Supplier<GraphTraversal<Edge, Edge>>> getGraphEStrategy(final Strategy.Context<StrategyWrappedGraph> ctx) {
+        return this.composeStrategyUnaryOperator(s -> s.getGraphEStrategy(ctx));
+    }
+
+    @Override
+    public UnaryOperator<Supplier<GraphTraversal>> getGraphOfStrategy(final Strategy.Context<StrategyWrappedGraph> ctx) {
+        return this.composeStrategyUnaryOperator(s -> s.getGraphOfStrategy(ctx));
     }
 
     @Override

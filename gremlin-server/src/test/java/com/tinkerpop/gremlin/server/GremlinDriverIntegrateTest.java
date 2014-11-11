@@ -2,20 +2,23 @@ package com.tinkerpop.gremlin.server;
 
 import com.tinkerpop.gremlin.driver.Client;
 import com.tinkerpop.gremlin.driver.Cluster;
-import com.tinkerpop.gremlin.driver.Item;
+import com.tinkerpop.gremlin.driver.Result;
 import com.tinkerpop.gremlin.driver.ResultSet;
 import com.tinkerpop.gremlin.driver.exception.ResponseException;
 import com.tinkerpop.gremlin.driver.message.ResponseStatusCode;
 import com.tinkerpop.gremlin.driver.ser.JsonBuilderKryoSerializer;
 import com.tinkerpop.gremlin.driver.ser.KryoMessageSerializerV1d0;
-import com.tinkerpop.gremlin.process.Traversal;
-import com.tinkerpop.gremlin.structure.Graph;
+import com.tinkerpop.gremlin.server.channel.NioChannelizer;
+import com.tinkerpop.gremlin.server.op.session.SessionOpProcessor;
+import com.tinkerpop.gremlin.structure.Vertex;
 import com.tinkerpop.gremlin.util.TimeUtil;
 import groovy.json.JsonBuilder;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
 
+import java.io.File;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -23,12 +26,12 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -42,6 +45,22 @@ public class GremlinDriverIntegrateTest extends AbstractGremlinServerIntegration
     @Rule
     public TestName name = new TestName();
 
+    /**
+     * Configure specific Gremlin Server settings for specific tests.
+     */
+    @Override
+    public Settings overrideSettings(final Settings settings) {
+        final String nameOfTest = name.getMethodName();
+        switch (nameOfTest) {
+            case "shouldExecuteScriptInSessionOnTransactionalGraph":
+                deleteDirectory(new File("/tmp/neo4j"));
+                settings.graphs.put("g", "conf/neo4j-empty.properties");
+                break;
+        }
+
+        return settings;
+    }
+
     @Test
     public void shouldProcessRequestsOutOfOrder() throws Exception {
         final Cluster cluster = Cluster.open();
@@ -50,8 +69,8 @@ public class GremlinDriverIntegrateTest extends AbstractGremlinServerIntegration
         final ResultSet rsFive = client.submit("Thread.sleep(5000);'five'");
         final ResultSet rsZero = client.submit("'zero'");
 
-        final CompletableFuture<List<Item>> futureFive = rsFive.all();
-        final CompletableFuture<List<Item>> futureZero = rsZero.all();
+        final CompletableFuture<List<Result>> futureFive = rsFive.all();
+        final CompletableFuture<List<Result>> futureZero = rsZero.all();
 
         final long start = System.nanoTime();
         assertFalse(futureFive.isDone());
@@ -139,7 +158,7 @@ public class GremlinDriverIntegrateTest extends AbstractGremlinServerIntegration
         final ResultSet results = client.submit("TinkerFactory.createClassic()");
 
         try {
-            final CompletableFuture<List<Item>> all = results.all();
+            final CompletableFuture<List<Result>> all = results.all();
             all.join();
             fail();
         } catch (Exception ex) {
@@ -161,10 +180,10 @@ public class GremlinDriverIntegrateTest extends AbstractGremlinServerIntegration
         final Cluster cluster = Cluster.build().serializer(serializer).create();
         final Client client = cluster.connect();
 
-        final ResultSet results = client.submit("TinkerFactory.createClassic()");
-        final List<Item> items = results.all().join();
-        assertEquals(1, items.size());
-        assertEquals("tinkergraph[vertices:6 edges:6]", items.get(0).getString());
+        final ResultSet resultSet = client.submit("TinkerFactory.createClassic()");
+        final List<Result> results = resultSet.all().join();
+        assertEquals(1, results.size());
+        assertEquals("tinkergraph[vertices:6 edges:6]", results.get(0).getString());
 
         cluster.close();
     }
@@ -179,7 +198,7 @@ public class GremlinDriverIntegrateTest extends AbstractGremlinServerIntegration
         final Cluster cluster = Cluster.build().serializer(serializer).create();
         final Client client = cluster.connect();
 
-        final List<Item> json = client.submit("b = new JsonBuilder();b.people{person {fname 'stephen'\nlname 'mallette'}};b").all().join();
+        final List<Result> json = client.submit("b = new JsonBuilder();b.people{person {fname 'stephen'\nlname 'mallette'}};b").all().join();
         assertEquals("{\"people\":{\"person\":{\"fname\":\"stephen\",\"lname\":\"mallette\"}}}", json.get(0).getString());
         cluster.close();
     }
@@ -233,6 +252,27 @@ public class GremlinDriverIntegrateTest extends AbstractGremlinServerIntegration
 
         final ResultSet results3 = client.submit("x[1]+2");
         assertEquals(4, results3.all().get().get(0).getInt());
+
+        cluster.close();
+    }
+
+    @Test
+    public void shouldExecuteScriptInSessionOnTransactionalGraph() throws Exception {
+        final Cluster cluster = Cluster.build().create();
+        final Client client = cluster.connect(name.getMethodName());
+
+        final Vertex vertexBeforeTx = client.submit("v=g.addVertex(\"name\",\"stephen\")").all().get().get(0).getVertex();
+        assertEquals("stephen", vertexBeforeTx.iterators().valueIterator("name").next());
+
+        final Vertex vertexFromV = client.submit("g.V().next()").all().get().get(0).getVertex();
+        assertEquals("stephen", vertexFromV.iterators().valueIterator("name").next());
+
+        final Vertex vertexFromBinding = client.submit("v").all().get().get(0).getVertex();
+        assertEquals("stephen", vertexFromBinding.iterators().valueIterator("name").next());
+
+        final Vertex vertexAfterTx = client.submit("v.property(\"color\",\"blue\"); g.tx().commit(); v").all().get().get(0).getVertex();
+        assertEquals("stephen", vertexAfterTx.iterators().valueIterator("name").next());
+        assertEquals("blue", vertexAfterTx.iterators().valueIterator("color").next());
 
         cluster.close();
     }

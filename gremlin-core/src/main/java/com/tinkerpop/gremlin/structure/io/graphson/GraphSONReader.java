@@ -11,6 +11,7 @@ import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.VertexProperty;
 import com.tinkerpop.gremlin.structure.io.GraphReader;
 import com.tinkerpop.gremlin.structure.util.batch.BatchGraph;
 import com.tinkerpop.gremlin.structure.util.detached.DetachedEdge;
@@ -23,6 +24,8 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +39,7 @@ import java.util.stream.Collectors;
  * float will become a double, element IDs may not be retrieved in the format they were serialized, etc.).
  * {@link Edge} and {@link Vertex} objects are serialized to {@code Map} instances.  If an
  * {@link com.tinkerpop.gremlin.structure.Element} is used as a key, it is coerced to its identifier.  Other complex
- * objects are converted via {@link Object#toString()}.
+ * objects are converted via {@link Object#toString()} unless there is a custom serializer supplied.
  *
  * @author Stephen Mallette (http://stephen.genoprime.com)
  */
@@ -90,8 +93,8 @@ public class GraphSONReader implements GraphReader {
                         readVertexData(vertexData, detachedVertex -> {
                             final Vertex v = Optional.ofNullable(graph.v(detachedVertex.id())).orElse(
                                     graph.addVertex(T.label, detachedVertex.label(), T.id, detachedVertex.id()));
-                            detachedVertex.iterators().propertyIterator().forEachRemaining(p -> v.<Object>property(p.key(), p.value()));
-                            detachedVertex.iterators().hiddenPropertyIterator().forEachRemaining(p -> v.<Object>property(Graph.Key.hide(p.key()), p.value()));
+                            detachedVertex.iterators().propertyIterator().forEachRemaining(p -> createVertexProperty(graphToWriteTo, v, p, false));
+                            detachedVertex.iterators().hiddenPropertyIterator().forEachRemaining(p -> createVertexProperty(graphToWriteTo, v, p, true));
                             return v;
                         });
                     }
@@ -154,6 +157,15 @@ public class GraphSONReader implements GraphReader {
         return v;
     }
 
+    private static void createVertexProperty(final Graph graphToWriteTo, final Vertex v, final VertexProperty<Object> p, final boolean hidden) {
+        final List<Object> propertyArgs = new ArrayList<>();
+        if (graphToWriteTo.features().vertex().properties().supportsUserSuppliedIds())
+            propertyArgs.addAll(Arrays.asList(T.id, p.id()));
+        p.iterators().propertyIterator().forEachRemaining(it -> propertyArgs.addAll(Arrays.asList(it.key(), it.value())));
+        p.iterators().hiddenPropertyIterator().forEachRemaining(it -> propertyArgs.addAll(Arrays.asList(Graph.Key.hide(it.key()), it.value())));
+        v.property(hidden ? Graph.Key.hide(p.key()) : p.key(), p.value(), propertyArgs.toArray());
+    }
+
     private static void readVertexEdges(final Function<DetachedEdge, Edge> edgeMaker, final Map<String, Object> vertexData, final String direction) throws IOException {
         final List<Map<String, Object>> edgeDatas = (List<Map<String, Object>>) vertexData.get(direction);
         for (Map<String, Object> edgeData : edgeDatas) {
@@ -199,11 +211,21 @@ public class GraphSONReader implements GraphReader {
         private Builder() {
         }
 
+        /**
+         * The name of the key to supply to
+         * {@link com.tinkerpop.gremlin.structure.util.batch.BatchGraph.Builder#vertexIdKey} when reading data into
+         * the {@link Graph}.
+         */
         public Builder vertexIdKey(final String vertexIdKey) {
             this.vertexIdKey = vertexIdKey;
             return this;
         }
 
+        /**
+         * The name of the key to supply to
+         * {@link com.tinkerpop.gremlin.structure.util.batch.BatchGraph.Builder#edgeIdKey} when reading data into
+         * the {@link Graph}.
+         */
         public Builder edgeIdKey(final String edgeIdKey) {
             this.edgeIdKey = edgeIdKey;
             return this;
@@ -226,6 +248,10 @@ public class GraphSONReader implements GraphReader {
             return this;
         }
 
+        /**
+         * If data types of objects were embedded into the JSON that is to be read, then this value must be set to
+         * true.
+         */
         public Builder embedTypes(final boolean embedTypes) {
             this.embedTypes = embedTypes;
             return this;
@@ -243,7 +269,7 @@ public class GraphSONReader implements GraphReader {
             final ObjectMapper mapper = GraphSONObjectMapper.build()
                     .customModule(custom)
                     .embedTypes(embedTypes)
-                    .loadCustomModules(loadCustomModules).build();
+                    .loadCustomModules(loadCustomModules).create();
             return new GraphSONReader(mapper, batchSize, vertexIdKey, edgeIdKey);
         }
     }

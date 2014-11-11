@@ -1,6 +1,7 @@
 package com.tinkerpop.gremlin;
 
 import com.tinkerpop.gremlin.process.Traversal;
+import com.tinkerpop.gremlin.process.TraversalEngine;
 import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Vertex;
@@ -22,8 +23,10 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assume.assumeThat;
 
 /**
@@ -94,7 +97,9 @@ public abstract class AbstractGremlinTest {
         for (FeatureRequirement fr : featureRequirementSet) {
             try {
                 //System.out.println(String.format("Assume that %s meets Feature Requirement - %s - with %s", fr.featureClass().getSimpleName(), fr.feature(), fr.supported()));
-                assumeThat(g.features().supports(fr.featureClass(), fr.feature()), is(fr.supported()));
+                assumeThat(String.format("%s does not support all of the features required by this test so it will be ignored: %s.%s=%s",
+                                g.getClass().getSimpleName(), fr.featureClass().getSimpleName(), fr.feature(), fr.supported()),
+                        g.features().supports(fr.featureClass(), fr.feature()), is(fr.supported()));
             } catch (NoSuchMethodException nsme) {
                 throw new NoSuchMethodException(String.format("[supports%s] is not a valid feature on %s", fr.feature(), fr.featureClass()));
             }
@@ -108,7 +113,7 @@ public abstract class AbstractGremlinTest {
         afterLoadGraphWith(g);
     }
 
-    protected void beforeLoadGraphWith(final Graph g) throws Exception  {
+    protected void beforeLoadGraphWith(final Graph g) throws Exception {
         // do nothing
     }
 
@@ -210,7 +215,7 @@ public abstract class AbstractGremlinTest {
         final boolean muted = Boolean.parseBoolean(System.getProperty("muteTestLogs", "false"));
 
         if (!muted) System.out.println("Testing: " + traversal);
-        traversal.strategies().apply();
+        traversal.applyStrategies(TraversalEngine.STANDARD); // TODO!!!!
         if (!muted) System.out.println("         " + traversal);
     }
 
@@ -222,16 +227,6 @@ public abstract class AbstractGremlinTest {
     }
 
     public static void validateException(final Throwable expected, final Throwable actual) {
-        assertEquals(expected.getMessage(), actual.getMessage());
-        assertEquals(expected.getClass(), actual.getClass());
-        /*Throwable cause = actual;
-        while (cause != null) {
-            if (cause.getClass().equals(expected.getClass()) && cause.getMessage().equals(expected.getMessage())) {
-                return;
-            } else {
-                cause = cause.getCause();
-            }
-        }
-        fail("The exception doesn't match excepted: " + actual + "::" + expected);*/
+        assertThat(actual, instanceOf(expected.getClass()));
     }
 }

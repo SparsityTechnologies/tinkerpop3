@@ -393,7 +393,7 @@ marko.addEdge("created",lop,"weight",0.6d);
 The above graph creates two vertices named "marko" and "lop" and connects them via a created-edge with a weight=0.6 property. Next, the graph can be queried as such.
 
 [source,java]
-g.V().has("name","marko").out("created").value("name")
+g.V().has("name","marko").out("created").values("name")
 
 The `g.V().has("name","marko")` part of the query can be executed in two ways.
 
@@ -458,7 +458,7 @@ gremlin> g = Neo4jGraph.open('/tmp/neo4j')
 ==>neo4jgraph[EmbeddedGraphDatabase [/tmp/neo4j]]
 ----
 
-WARNING: As of `neo4j-gremlin x.y.z` there is a bug concerning how `ext/neo4j-gremlin` jars are loaded. The seemlingly crazy workaround is to rename `ext/neo4j-gremlin/neo4j-lucene-index-2.1.4.jar` to `ext/neo4j-gremlin/a.jar`. We are unsure why this happens, but found that to work or to move the `neo4j-lucene-index-2.1.4.jar` to the `lib/` directory.
+WARNING: As of `neo4j-gremlin x.y.z` there is a bug concerning how `ext/neo4j-gremlin` jars are loaded. The seemingly crazy workaround is to rename `ext/neo4j-gremlin/neo4j-lucene-index-2.1.4.jar` to `ext/neo4j-gremlin/a.jar`. We are unsure why this happens, but found that to work or to move the `neo4j-lucene-index-2.1.4.jar` to the `lib/` directory.
 
 For those leveraging Neo4j High Availability, configure `Neo4jGraph` for "HA mode" by setting the `gremlin.neo4j.ha` flag to `true` in the `Configuration` object passed to `Neo4jGraph.open()`.  Note that when the flag is set (by default it is `false`), the `Neo4jGraph` instance expects HA configuration settings to be present.  As with embedded Neo4j, HA configuration keys should be prefixed with `gremlin.neo4j.conf`.  Please consult Neo4j documentation for more information on link:http://docs.neo4j.org/chunked/stable/ha.html[High Availability] configuration.
 
@@ -496,7 +496,7 @@ gremlin> g.addVertex(label,'person','name','marko')
 ==>v[0]
 gremlin> g.addVertex(label,'dog','name','puppy')
 ==>v[1]
-gremlin> g.V().has(label,'person').has('name','marko').value('name')
+gremlin> g.V().has(label,'person').has('name','marko').values('name')
 ==>marko
 
 Below demonstrates the runtime benefits of indices and demonstrates how if there is no defined schema index (only vertex labels), a linear scan of the vertex-label partition is still faster than a linear scan of all vertices.
@@ -553,7 +553,7 @@ gremlin> g.addVertex(label,'person','name','marko')
 ==>v[0]
 gremlin> g.addVertex(label,'dog','name','puppy')
 ==>v[1]
-gremlin> g.V().has(label,'person').has('name','marko').value('name')
+gremlin> g.V().has(label,'person').has('name','marko').values('name')
 ==>marko
 
 WARNING: The preferred method for dealing with automatic indices in Neo4j is via `Neo4jGraph.open()` configuration as opposed to runtime updating as demonstrated above. This is because with runtime updating, index information is not propagated across Neo4j connections.
@@ -572,11 +572,11 @@ gremlin> g.loadKryo('data/tinkerpop-classic.gio')
 ==>null
 gremlin> g.cypher('MATCH (a {name:"marko"}) RETURN a')
 ==>[a:v[0]]
-gremlin> g.cypher('MATCH (a {name:"marko"}) RETURN a').select('a').out('knows').value('name')
+gremlin> g.cypher('MATCH (a {name:"marko"}) RETURN a').select('a').out('knows').values('name')
 ==>vadas
 ==>josh
 gremlin> g.cypher("MATCH (n{name:'marko'})-[:knows]->(m) RETURN m").select('m').id().fold().
-             cypher("MATCH (m)-[:created]->(n) WHERE id(m) in {start} RETURN n").select('n').value('name')
+             cypher("MATCH (m)-[:created]->(n) WHERE id(m) in {start} RETURN n").select('n').values('name')
 ==>lop
 ==>ripple
 
@@ -648,16 +648,16 @@ The `GiraphGraphComputer` makes use of a properties file much like any other `Gr
 
 [source,text]
 gremlin.graph=com.tinkerpop.gremlin.giraph.structure.GiraphGraph
-giraph.gremlin.inputLocation=tinkerpop-classic-vertices.gio
+gremlin.giraph.inputLocation=tinkerpop-classic-vertices.gio
 giraph.vertexInputFormatClass=com.tinkerpop.gremlin.giraph.structure.io.kryo.KryoVertexInputFormat
-giraph.gremlin.outputLocation=output
+gremlin.giraph.outputLocation=output
 giraph.vertexOutputFormatClass=com.tinkerpop.gremlin.giraph.structure.io.kryo.KryoVertexOutputFormat
-giraph.gremlin.memoryOutputFormatClass=org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat
+gremlin.giraph.memoryOutputFormatClass=org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat
 gremlin.vertexProgram=com.tinkerpop.gremlin.process.computer.traversal.TraversalVertexProgram
 gremlin.traversalVertexProgram.traversalSupplier.type=CLASS
 gremlin.traversalVertexProgram.traversalSupplier.object=com.tinkerpop.gremlin.giraph.process.graph.example.TraversalSupplier1
-giraph.gremlin.jarsInDistributedCache=true
-giraph.gremlin.deriveMemory=false
+gremlin.giraph.jarsInDistributedCache=true
+gremlin.giraph.deriveMemory=false
 giraph.minWorkers=2
 giraph.maxWorkers=2
 
@@ -667,26 +667,22 @@ A review of the properties above are presented in the table below.
 |=========================================================
 |Property |Description
 |gremlin.graph |The class of the graph to construct using GraphFactory
-|giraph.gremlin.inputLocation |The location of the input file(s) for Giraph to read the graph from.
+|gremlin.giraph.inputLocation |The location of the input file(s) for Giraph to read the graph from.
 |giraph.vertexInputFormatClass |The format that the graph input file(s) are represented in.
-|giraph.gremlin.outputLocation |The location to write the computed Giraph graph to.
+|gremlin.giraph.outputLocation |The location to write the computed Giraph graph to.
 |giraph.vertexOutputFormatClass |The format that the output file(s) should be represented in.
-|giraph.gremlin.memoryOutputFormatClass |The format of any resultant GraphComputer Memory.
+|gremlin.giraph.memoryOutputFormatClass |The format of any resultant GraphComputer Memory.
 |gremlin.vertexProgram |The `VertexProgram` to distribute to all vertices in the `GiraphGraph`
 |gremlin.traversalVertexProgram.traversalSupplier.object |For `TraversalVertexProgram`, the location of the Gremlin traversal to use (if not using Gremlin Console).
 |gremlin.traversalVertexProgram.traversalSupplier.type | Whether the traversal supplier is a CLASS, SCRIPT, or OBJECT.
-|giraph.gremlin.jarsInDistributedCache |Whether to upload the Giraph-Gremlin jars to Hadoop's distributed cache (necessary if jars are not on machines' classpaths).
-|giraph.gremlin.deriveMemory |Whether or not `Memory` is yielded (requires an extra MapReduce job if true).
+|gremlin.giraph.jarsInDistributedCache |Whether to upload the Giraph-Gremlin jars to Hadoop's distributed cache (necessary if jars are not on machines' classpaths).
+|gremlin.giraph.deriveMemory |Whether or not `Memory` is yielded (requires an extra MapReduce job if true).
 |giraph.minWorkers |The minimum number of parallel workers to execute the vertices of the graph.
 |giraph.maxWorkers |The maximum number of parallel workers to execute the vertices of the graph.
 |=========================================================
 
 IMPORTANT: The maximum number of workers can be no larger than the number of map-slots in the Hadoop cluster minus 1. For example, if the Hadoop cluster has 4 map slots, then `giraph.maxWorkers` can not be larger than 3. One map-slot is reserved for the master compute node and all other slots can be allocated as workers to execute the VertexPrograms on the vertices of the graph.
 
-The above properties file states:
-
-	The location of the graph is tinkerpop-classic-vertices.gio. Interpret that file using KryoVertexInputFormat. When evaluating the graph over the Giraph/Hadoop cluster, execute the TraversalVertexProgram on all vertices of the graph using the traversal defined in TraversalSupplier1. Write the computed on GiraphGraph to output/ using the KryoVertexOutputFormat. Use 2 workers (thus, 3 map-slots) to execute the job.
- 
 Along with the properties above, the numerous link:http://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/core-default.xml[Hadoop specific properties] can be added as needed to tune and parameterize the executed Giraph-Gremlin job on the respective Hadoop cluster.
 
 OLTP Giraph-Gremlin
@@ -705,7 +701,7 @@ gremlin> g = GraphFactory.open('../../../giraph-gremlin/conf/giraph-kryo.propert
 ==>giraphgraph[kryovertexinputformat->kryovertexoutputformat]
 gremlin> g.V().count()
 ==>6
-gremlin> g.V().out().out().value('name')
+gremlin> g.V().out().out().values('name')
 ==>ripple
 ==>lop
 gremlin> g.V().groupBy{it.get().value('name')[1]}{it.get().value('name')}.next()
@@ -719,7 +715,7 @@ OLAP Giraph-Gremlin
 
 image:giraph-furnace.png[width=110,float=left] Giraph-Gremlin was designed to execute OLAP operations via `GraphComputer`. The OLTP examples presented above are reproduced below, but using `TraversalVertexProgram` for the execution of the Gremlin traversal.
 
-IMPORTANT: When using Giraph-Gremlin OLAP from the Gremlin Console, the only Gremlin language subset supported is Gremlin-Groovy.
+IMPORTANT: As of TinkerPop3 x.y.z, when using Giraph-Gremlin OLAP from the Gremlin Console, the only Gremlin language subset supported is Gremlin-Groovy. Future versions will support other Gremlin language dialects.
 
 [source,text]
 gremlin> :remote connect tinkerpop.giraph ../../../giraph-gremlin/conf/giraph-kryo.properties
@@ -734,7 +730,7 @@ INFO  org.apache.hadoop.mapred.JobClient  - Running job: job_201407281259_0038
 INFO  org.apache.hadoop.mapred.JobClient  -  map 0% reduce 0%
 ...
 ==>6
-gremlin> :> g.V().out().out().value('name')
+gremlin> :> g.V().out().out().values('name')
 INFO  com.tinkerpop.gremlin.giraph.process.computer.GiraphGraphComputer  - GiraphGremlin: TraversalVertexProgram[GiraphGraphStep, VertexStep(OUT), VertexStep(OUT), ElementValueStep(name)]
 INFO  org.apache.hadoop.mapred.JobClient  - Running job: job_201407281259_0031
 INFO  org.apache.hadoop.mapred.JobClient  -  map 0% reduce 0%
@@ -769,7 +765,7 @@ gremlin> result.memory().a
 
 NOTE: Distributed graph computations on cluster-sized graphs can yield an enormous number of results. To be safe, Giraph-Gremlin only returns up to 20 results to the console (with, of course, all the results being available in HDFS). If more traversal results are desired, access `result.memory().get(Graph.System.system('traversers'))`.
 
-TIP: image:gremlin-sugar.png[width=50,float=left] For those wanting to use the <<sugar-plugin,SugarPlugin>> with their submitted traversal, do `:remote config useSugar true` as well as `:plugin use sugar` at the start of the Gremlin Console session if it is not already activated.
+TIP: image:gremlin-sugar.png[width=50,float=left] For those wanting to use the <<sugar-plugin,SugarPlugin>> with their submitted traversal, do `:remote config useSugar true` as well as `:plugin use tinkerpop.sugar` at the start of the Gremlin Console session if it is not already activated.
 
 The results of the graph traversal are stored in HDFS accessible via `hdfs`.
 
@@ -784,7 +780,7 @@ gremlin> hdfs.ls('output/a')
 ==>rw-r--r-- marko supergroup 0 _SUCCESS
 ==>rwxr-xr-x marko supergroup 0 (D) _logs
 ==>rw-r--r-- marko supergroup 332 part-r-00000
-gremlin> hdfs.head('output/a',KryoWritable.class)
+gremlin> hdfs.head('output/a',GremlinWritable.class)
 ==>[a, [marko, vadas]]
 ==>[e, [peter]]
 ==>[i, [ripple]]
@@ -818,7 +814,7 @@ The `TraversalSupplier1` class mentioned in the `giraph-kryo.properties` file is
 
 public class TraversalSupplier1 implements SSupplier<Traversal> {
     public Traversal get() {
-        return GiraphGraph.open().V().out().out().value("name");
+        return GiraphGraph.open().V().out().out().values("name");
     }
 }
 ----
@@ -836,7 +832,6 @@ NOTE: The extension `ldjson` in `giraph-graphson.properties` refers to link:http
 $ hadoop fs -copyFromLocal data/tinkerpop-classic-vertices.ldjson tinkerpop-classic-vertices.ldjson
 $ hadoop fs -ls
 Found 2 items
--rw-r--r--   1 marko supergroup        891 2014-07-28 13:00 /user/marko/tinkerpop-classic-vertices.gio
 -rw-r--r--   1 marko supergroup       2356 2014-07-28 13:00 /user/marko/tinkerpop-classic-vertices.ldjson
 $ hadoop jar target/giraph-gremlin-x.y.z-job.jar com.tinkerpop.gremlin.giraph.process.computer.GiraphGraphComputer conf/giraph-graphson.properties
 14/07/29 12:08:27 INFO computer.GiraphGraphComputer: GiraphGremlin: PageRankVertexProgram[alpha=0.85,iterations=30]

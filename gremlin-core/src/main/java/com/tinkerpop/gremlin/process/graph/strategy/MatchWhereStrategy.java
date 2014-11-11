@@ -3,14 +3,17 @@ package com.tinkerpop.gremlin.process.graph.strategy;
 import com.tinkerpop.gremlin.process.Step;
 import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.process.TraversalStrategy;
-import com.tinkerpop.gremlin.process.graph.step.filter.DedupStep;
 import com.tinkerpop.gremlin.process.graph.step.filter.WhereStep;
 import com.tinkerpop.gremlin.process.graph.step.map.SelectStep;
 import com.tinkerpop.gremlin.process.graph.step.map.match.MatchStep;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.IdentityStep;
+import com.tinkerpop.gremlin.process.TraversalEngine;
 import com.tinkerpop.gremlin.process.util.TraversalHelper;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
@@ -18,12 +21,17 @@ import java.util.List;
 public class MatchWhereStrategy extends AbstractTraversalStrategy implements TraversalStrategy {
 
     private static final MatchWhereStrategy INSTANCE = new MatchWhereStrategy();
+    private static final Set<Class<? extends TraversalStrategy>> PRIORS = new HashSet<>();
+
+    static {
+        PRIORS.add(IdentityRemovalStrategy.class);
+    }
 
     private MatchWhereStrategy() {
     }
 
     @Override
-    public void apply(final Traversal<?, ?> traversal) {
+    public void apply(final Traversal<?, ?> traversal, TraversalEngine engine) {
         if (!TraversalHelper.hasStepOfClass(MatchStep.class, traversal))
             return;
 
@@ -52,8 +60,14 @@ public class MatchWhereStrategy extends AbstractTraversalStrategy implements Tra
         return INSTANCE;
     }
 
+
+    /*public int compareTo(final TraversalStrategy traversalStrategy) {
+        return traversalStrategy instanceof IdentityRemovalStrategy ? 1 : 0;
+    }*/
+
     @Override
-    public int compareTo(final TraversalStrategy traversalStrategy) {
-        return traversalStrategy instanceof IdentityReductionStrategy ? 1 : 0;
+    public Set<Class<? extends TraversalStrategy>> applyPrior() {
+        return PRIORS;
     }
+
 }

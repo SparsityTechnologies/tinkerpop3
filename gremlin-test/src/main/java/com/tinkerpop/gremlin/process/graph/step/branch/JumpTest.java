@@ -26,7 +26,7 @@ import static org.junit.Assert.*;
  */
 public abstract class JumpTest extends AbstractGremlinProcessTest {
 
-    public abstract Traversal<Vertex, String> get_g_v1_asXxX_out_jumpXx_loops_lt_2X_valueXnameX(final Object v1Id);
+    public abstract Traversal<Vertex, String> get_g_v1_asXxX_out_jumpXx_loops_lt_2X_name(final Object v1Id);
 
     public abstract Traversal<Vertex, Vertex> get_g_V_asXxX_out_jumpXx_loops_lt_2X();
 
@@ -54,7 +54,7 @@ public abstract class JumpTest extends AbstractGremlinProcessTest {
     @LoadGraphWith(MODERN)
     public void g_v1_asXxX_out_jumpXx_loops_lt_2X_valueXnameX() {
         final List<Traversal<Vertex, String>> traversals = new ArrayList<>();
-        traversals.add(get_g_v1_asXxX_out_jumpXx_loops_lt_2X_valueXnameX(convertToVertexId("marko")));
+        traversals.add(get_g_v1_asXxX_out_jumpXx_loops_lt_2X_name(convertToVertexId("marko")));
         traversals.add(get_g_v1_asXaX_jumpXb_loops_gt_1X_out_jumpXaX_asXbX_name(convertToVertexId("marko")));
         traversals.forEach(traversal -> {
             printTraversalForm(traversal);
@@ -184,8 +184,8 @@ public abstract class JumpTest extends AbstractGremlinProcessTest {
         }
 
         @Override
-        public Traversal<Vertex, String> get_g_v1_asXxX_out_jumpXx_loops_lt_2X_valueXnameX(final Object v1Id) {
-            return g.v(v1Id).as("x").out().jump("x", h -> h.loops() < 2).value("name");
+        public Traversal<Vertex, String> get_g_v1_asXxX_out_jumpXx_loops_lt_2X_name(final Object v1Id) {
+            return g.v(v1Id).as("x").out().jump("x", h -> h.loops() < 2).values("name");
         }
 
         @Override
@@ -210,12 +210,12 @@ public abstract class JumpTest extends AbstractGremlinProcessTest {
 
         @Override
         public Traversal<Vertex, String> get_g_V_asXxX_out_jumpXx_loops_lt_2X_asXyX_in_jumpXy_loops_lt_2X_name() {
-            return g.V().as("x").out().jump("x", t -> t.loops() < 2).as("y").in().jump("y", t -> t.loops() < 2).value("name");
+            return g.V().as("x").out().jump("x", t -> t.loops() < 2).as("y").in().jump("y", t -> t.loops() < 2).values("name");
         }
 
         @Override
         public Traversal<Vertex, String> get_g_V_asXxX_out_jumpXx_2X_asXyX_in_jumpXy_2X_name() {
-            return g.V().as("x").out().jump("x", 2).as("y").in().jump("y", 2).value("name");
+            return g.V().as("x").out().jump("x", 2).as("y").in().jump("y", 2).values("name");
         }
 
         @Override
@@ -240,7 +240,7 @@ public abstract class JumpTest extends AbstractGremlinProcessTest {
 
         @Override
         public Traversal<Vertex, String> get_g_v1_asXaX_jumpXb_loops_gt_1X_out_jumpXaX_asXbX_name(final Object v1Id) {
-            return g.v(v1Id).as("a").jump("b", t -> t.loops() > 1).out().jump("a").as("b").value("name");
+            return g.v(v1Id).as("a").jump("b", t -> t.loops() > 1).out().jump("a").as("b").values("name");
         }
     }
 
@@ -250,8 +250,8 @@ public abstract class JumpTest extends AbstractGremlinProcessTest {
         }
 
         @Override
-        public Traversal<Vertex, String> get_g_v1_asXxX_out_jumpXx_loops_lt_2X_valueXnameX(final Object v1Id) {
-            return g.v(v1Id).as("x").out().jump("x", t -> t.loops() < 2).<String>value("name").submit(g.compute());
+        public Traversal<Vertex, String> get_g_v1_asXxX_out_jumpXx_loops_lt_2X_name(final Object v1Id) {
+            return g.v(v1Id).as("x").out().jump("x", t -> t.loops() < 2).<String>values("name").submit(g.compute());
         }
 
         @Override
@@ -276,12 +276,12 @@ public abstract class JumpTest extends AbstractGremlinProcessTest {
 
         @Override
         public Traversal<Vertex, String> get_g_V_asXxX_out_jumpXx_loops_lt_2X_asXyX_in_jumpXy_loops_lt_2X_name() {
-            return g.V().as("x").out().jump("x", t -> t.loops() < 2).as("y").in().jump("y", t -> t.loops() < 2).<String>value("name").submit(g.compute());
+            return g.V().as("x").out().jump("x", t -> t.loops() < 2).as("y").in().jump("y", t -> t.loops() < 2).<String>values("name").submit(g.compute());
         }
 
         @Override
         public Traversal<Vertex, String> get_g_V_asXxX_out_jumpXx_2X_asXyX_in_jumpXy_2X_name() {
-            return g.V().as("x").out().jump("x", 2).as("y").in().jump("y", 2).<String>value("name").submit(g.compute());
+            return g.V().as("x").out().jump("x", 2).as("y").in().jump("y", 2).<String>values("name").submit(g.compute());
         }
 
         @Override
@@ -306,7 +306,7 @@ public abstract class JumpTest extends AbstractGremlinProcessTest {
 
         @Override
         public Traversal<Vertex, String> get_g_v1_asXaX_jumpXb_loops_gt_1X_out_jumpXaX_asXbX_name(final Object v1Id) {
-            return g.v(v1Id).as("a").jump("b", t -> t.loops() > 1).out().jump("a").as("b").<String>value("name").submit(g.compute());
+            return g.v(v1Id).as("a").jump("b", t -> t.loops() > 1).out().jump("a").as("b").<String>values("name").submit(g.compute());
         }
     }
 }

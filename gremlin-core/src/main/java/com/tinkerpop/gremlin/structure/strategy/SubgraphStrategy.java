@@ -1,32 +1,20 @@
 package com.tinkerpop.gremlin.structure.strategy;
 
-import com.tinkerpop.gremlin.process.Step;
-import com.tinkerpop.gremlin.process.Traversal;
-import com.tinkerpop.gremlin.process.TraversalStrategy;
-import com.tinkerpop.gremlin.process.computer.GraphComputer;
 import com.tinkerpop.gremlin.process.graph.GraphTraversal;
-import com.tinkerpop.gremlin.process.graph.marker.Reversible;
-import com.tinkerpop.gremlin.process.graph.step.filter.FilterStep;
-import com.tinkerpop.gremlin.process.graph.step.map.EdgeVertexStep;
-import com.tinkerpop.gremlin.process.graph.step.map.FlatMapStep;
-import com.tinkerpop.gremlin.process.graph.step.map.VertexStep;
-import com.tinkerpop.gremlin.process.graph.step.sideEffect.GraphStep;
-import com.tinkerpop.gremlin.process.util.EmptyTraversal;
-import com.tinkerpop.gremlin.process.util.TraversalHelper;
 import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.util.ElementHelper;
+import com.tinkerpop.gremlin.structure.util.StringFactory;
+import com.tinkerpop.gremlin.util.StreamFactory;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 /**
@@ -42,6 +30,7 @@ public class SubgraphStrategy implements GraphStrategy {
 
     protected Predicate<Vertex> vertexPredicate;
     protected Predicate<Edge> edgePredicate;
+    // TODO protected Predicate<VertexProperty> vertexPropertyPredicate;
 
     public SubgraphStrategy(final Predicate<Vertex> vertexPredicate, final Predicate<Edge> edgePredicate) {
         this.vertexPredicate = vertexPredicate;
@@ -49,19 +38,12 @@ public class SubgraphStrategy implements GraphStrategy {
     }
 
     @Override
-    public GraphTraversal applyStrategyToTraversal(final GraphTraversal traversal) {
-        traversal.strategies().register(new SubgraphTraversalStrategy());
-        return traversal;
-    }
-
-    @Override
     public UnaryOperator<Function<Object, Vertex>> getGraphvStrategy(final Strategy.Context<StrategyWrappedGraph> ctx) {
         return (f) -> (id) -> {
             final Vertex v = f.apply(id);
-            if (!testVertex(v)) {
+            if (!this.testVertex(v)) {
                 throw Graph.Exceptions.elementNotFound(Vertex.class, id);
             }
-
             return v;
         };
     }
@@ -71,13 +53,50 @@ public class SubgraphStrategy implements GraphStrategy {
         return (f) -> (id) -> {
             final Edge e = f.apply(id);
 
-            if (!testEdge(e)) {
+            if (!this.testEdge(e)) {
                 throw Graph.Exceptions.elementNotFound(Edge.class, id);
             }
 
             return e;
         };
     }
+
+    @Override
+    public UnaryOperator<BiFunction<Direction, String[], Iterator<Vertex>>> getVertexIteratorsVerticesStrategy(final Strategy.Context<StrategyWrappedVertex> ctx) {
+        return (f) -> (direction, labels) -> StreamFactory
+                .stream(ctx.getCurrent().edgeIterator(direction, labels))
+                .filter(this::testEdge)
+                .map(edge -> otherVertex(direction, ctx.getCurrent(), edge))
+                .filter(this::testVertex)
+                .map(v -> ((StrategyWrappedVertex) v).getBaseVertex()).iterator();
+        // TODO: why do we have to unwrap? Note that we are not doing f.apply() like the other methods. Is this bad?
+    }
+
+    @Override
+    public UnaryOperator<BiFunction<Direction, String[], Iterator<Edge>>> getVertexIteratorsEdgesStrategy(final Strategy.Context<StrategyWrappedVertex> ctx) {
+        return (f) -> (direction, labels) -> StreamFactory.stream(f.apply(direction, labels)).filter(this::testEdge).iterator();
+    }
+
+    @Override
+    public UnaryOperator<Function<Direction, Iterator<Vertex>>> getEdgeIteratorsVerticesStrategy(final Strategy.Context<StrategyWrappedEdge> ctx) {
+        return (f) -> direction -> StreamFactory.stream(f.apply(direction)).filter(this::testVertex).iterator();
+    }
+
+    @Override
+    public UnaryOperator<Supplier<GraphTraversal<Vertex, Vertex>>> getGraphVStrategy(final Strategy.Context<StrategyWrappedGraph> ctx) {
+        return (f) -> () -> f.get().filter(t -> this.testVertex(t.get())); // TODO: we should make sure index hits go first.
+    }
+
+    @Override
+    public UnaryOperator<Supplier<GraphTraversal<Edge, Edge>>> getGraphEStrategy(final Strategy.Context<StrategyWrappedGraph> ctx) {
+        return (f) -> () -> f.get().filter(t -> this.testEdge(t.get()));  // TODO: we should make sure index hits go first.
+    }
+
+    // TODO: make this work for DSL -- we need Element predicate
+    /*public UnaryOperator<Supplier<GraphTraversal>> getGraphOfStrategy(final Strategy.Context<StrategyWrappedGraph> ctx) {
+        return (f) -> () -> f.get().filter(el);
+    }*/
+
 
     private boolean testVertex(final Vertex vertex) {
         return vertexPredicate.test(vertex);
@@ -93,314 +112,22 @@ public class SubgraphStrategy implements GraphStrategy {
     }
 
     private boolean testElement(final Element element) {
-        return element instanceof Vertex
-                ? testVertex((Vertex) element)
-                : testEdge((Edge) element);
+        return element instanceof Vertex ? testVertex((Vertex) element) : testEdge((Edge) element);
+    }
+
+    private static final Vertex otherVertex(final Direction direction, final Vertex start, final Edge edge) {
+        if (direction.equals(Direction.BOTH)) {
+            final Vertex inVertex = edge.iterators().vertexIterator(Direction.IN).next();
+            return ElementHelper.areEqual(start, inVertex) ?
+                    edge.iterators().vertexIterator(Direction.OUT).next() :
+                    inVertex;
+        } else {
+            return edge.iterators().vertexIterator(direction.opposite()).next();
+        }
     }
 
     @Override
     public String toString() {
-        return SubgraphStrategy.class.getSimpleName().toLowerCase();
-    }
-
-    private class SubgraphTraversalStrategy implements TraversalStrategy.NoDependencies {
-
-        @Override
-        public void apply(final Traversal traversal) {
-            // modify the traversal by appending filters after some steps, replacing others.  the idea is to
-            // find VertexStep instances and replace them with SubgraphVertexStep. after each GraphStep,
-            // EdgeVertexStep insert a SubgraphFilterStep.
-            final List<Class> insertAfterSteps = Arrays.<Class>asList(GraphStep.class, EdgeVertexStep.class);
-            final List<Integer> insertAfterPositions = new ArrayList<>();
-            final List<Integer> replacePositions = new ArrayList<>();
-            final List<Step> traversalSteps = traversal.getSteps();
-            for (int i = 0; i < traversalSteps.size(); i++) {
-                final int pos = i;
-                if (insertAfterSteps.stream().anyMatch(c -> c.isAssignableFrom(traversalSteps.get(pos).getClass()))) {
-                    insertAfterPositions.add(i);
-                }
-
-                if (VertexStep.class.isAssignableFrom(traversalSteps.get(pos).getClass())) {
-                    replacePositions.add(i);
-                }
-            }
-
-            for (int pos : replacePositions) {
-                final VertexStep other = (VertexStep) traversalSteps.get(pos);
-                TraversalHelper.replaceStep(traversalSteps.get(pos), new SubgraphVertexStep(other), traversal);
-            }
-
-            Collections.reverse(insertAfterPositions);
-            for (int pos : insertAfterPositions) {
-                TraversalHelper.insertStep(new SubgraphFilterStep(traversal), pos + 1, traversal);
-            }
-        }
-    }
-
-    /**
-     * A step that checks the subgraph filters to ensure that a {@link Element} should pass through.
-     */
-    private class SubgraphFilterStep extends FilterStep<Element> implements Reversible {
-
-        public SubgraphFilterStep(final Traversal traversal) {
-            super(traversal);
-            this.setPredicate(traverser -> testElement(traverser.get()));
-        }
-
-        public String toString() {
-            return TraversalHelper.makeStepString(this, vertexPredicate, edgePredicate);
-        }
-    }
-
-    /**
-     * A step that wraps up the adjacent traversal from the vertex allowing the results to be iterated within the
-     * context of the subgraph filters.
-     */
-    private class SubgraphVertexStep<E extends Element> extends FlatMapStep<Vertex, E> { // TODO: implement Reversible
-
-        private final Direction direction;
-
-        public SubgraphVertexStep(final VertexStep<E> other) {
-            this(other.getTraversal(), other.getReturnClass(), other.getDirection(), other.getBranchFactor(), other.getEdgeLabels());
-        }
-
-        public SubgraphVertexStep(final Traversal traversal,
-                                  final Class<E> returnClass,
-                                  final Direction direction,
-                                  final int branchFactor,
-                                  final String... labels) {
-            super(traversal);
-            this.direction = direction;
-            this.setFunction(traverser -> {
-                final Vertex nextVertex = traverser.get();
-                if (testVertex(nextVertex)) {
-
-                    Iterator<E> iter = null;
-
-                    if (Vertex.class.isAssignableFrom(returnClass)) {
-                        Iterator<Vertex> vertexIter = null;
-                        switch (direction) {
-                            case OUT:
-                                vertexIter = new EdgeVertexIterator(Direction.OUT, nextVertex.outE(labels));
-                                break;
-                            case IN:
-                                vertexIter = new EdgeVertexIterator(Direction.IN, nextVertex.inE(labels));
-                                break;
-                            case BOTH:
-                                vertexIter = new MultiIterator<>(
-                                        new EdgeVertexIterator(Direction.IN, nextVertex.inE(labels)),
-                                        new EdgeVertexIterator(Direction.OUT, nextVertex.outE(labels)));
-                                break;
-                        }
-
-                        iter = (Iterator<E>) vertexIter;
-                    } else {
-                        Iterator<Edge> edgeIter = null;
-                        switch (direction) {
-                            case OUT:
-                                edgeIter = nextVertex.outE(labels);
-                                break;
-                            case IN:
-                                edgeIter = nextVertex.inE(labels);
-                                break;
-                            case BOTH:
-                                edgeIter = nextVertex.bothE(labels);
-                                break;
-                        }
-
-                        edgeIter = new EdgeIterator(edgeIter);
-                        iter = (Iterator<E>) edgeIter;
-                    }
-
-                    if (branchFactor > 0)
-                        iter = new BranchFactorIterator<>(branchFactor, iter);
-
-                    return iter;
-                } else {
-                    return new EmptyGraphTraversal();
-                }
-            });
-        }
-
-        public String toString() {
-            return TraversalHelper.makeStepString(this, this.direction);
-        }
-    }
-
-    private class EmptyGraphTraversal<S, E> extends EmptyTraversal<S, E> implements GraphTraversal<S, E> {
-
-        @Override
-        public GraphTraversal<S, E> submit(final GraphComputer computer) {
-            return new EmptyGraphTraversal<>();
-        }
-
-        @Override
-        public <E2> GraphTraversal<S, E2> addStep(final Step<?, E2> step) {
-            return (GraphTraversal) this;
-        }
-
-    }
-
-    private class EdgeIterator implements Iterator<Edge> {
-        private final Iterator<Edge> baseIterator;
-
-        private Edge nextElement;
-
-        private EdgeIterator(final Iterator<Edge> baseIterator) {
-            this.baseIterator = baseIterator;
-            advanceToNext();
-        }
-
-        @Override
-        public boolean hasNext() {
-            return null != nextElement;
-        }
-
-        @Override
-        public Edge next() {
-            if (null == nextElement) throw new NoSuchElementException();
-            final Edge tmp = nextElement;
-            advanceToNext();
-            return tmp;
-        }
-
-        private void advanceToNext() {
-            while (baseIterator.hasNext()) {
-                final Edge nextBaseElement = baseIterator.next();
-                if (testEdge(nextBaseElement)) {
-                    nextElement = nextBaseElement;
-                    return;
-                }
-            }
-
-            nextElement = null;
-        }
-    }
-
-    private class EdgeVertexIterator implements Iterator<Vertex> {
-        private final Direction direction;
-
-        private final Iterator<Edge> edgeIterator;
-        private Iterator<Vertex> vertexIterator;
-
-        private Edge nextEdge;
-        private Vertex nextVertex;
-
-        private EdgeVertexIterator(final Direction direction,
-                                   final Iterator<Edge> baseIterator) {
-            if (direction == Direction.BOTH) throw new IllegalArgumentException();
-            this.direction = direction;
-            this.edgeIterator = baseIterator;
-            advanceToNext();
-        }
-
-        @Override
-        public boolean hasNext() {
-            return null != nextVertex;
-        }
-
-        @Override
-        public Vertex next() {
-            if (null == nextVertex) throw new NoSuchElementException();
-            final Vertex tmp = nextVertex;
-            advanceToNext();
-            return tmp;
-        }
-
-        private void advanceToNext() {
-            do {
-                while (null != vertexIterator && vertexIterator.hasNext()) {
-                    final Vertex nextBaseVertex = vertexIterator.next();
-                    if (testVertex(nextBaseVertex)) {
-                        nextVertex = nextBaseVertex;
-                        return;
-                    }
-                }
-
-                if (!edgeIterator.hasNext()) {
-                    nextVertex = null;
-                    return;
-                }
-
-                final Edge nextBaseEdge = edgeIterator.next();
-                if (testEdge(nextBaseEdge)) {
-                    nextEdge = nextBaseEdge;
-                    switch (direction) {
-                        case OUT:
-                            vertexIterator = nextEdge.inV();
-                            break;
-                        case IN:
-                            vertexIterator = nextEdge.outV();
-                            break;
-                    }
-                }
-            } while (true); // break out when the next vertex is found or the iterator is exhausted
-        }
-    }
-
-    private class BranchFactorIterator<V> implements Iterator<V> {
-        private final int branchFactor;
-        private final Iterator<V> baseIterator;
-        private long count = 0;
-
-        private BranchFactorIterator(final int branchFactor,
-                                     final Iterator<V> baseIterator) {
-            this.branchFactor = branchFactor;
-            this.baseIterator = baseIterator;
-        }
-
-        @Override
-        public boolean hasNext() {
-            return count < branchFactor && baseIterator.hasNext();
-        }
-
-        @Override
-        public V next() {
-            if (count >= branchFactor) throw new NoSuchElementException();
-            count++;
-            return baseIterator.next();
-        }
-    }
-
-    private class MultiIterator<V> implements Iterator<V> {
-        private final Iterator<V>[] baseIterators;
-        private int iteratorIndex;
-        private V nextItem;
-
-        private MultiIterator(final Iterator<V>... baseIterators) {
-            this.baseIterators = baseIterators;
-            if (0 == baseIterators.length) throw new IllegalArgumentException("must supply at least one base iterator");
-            iteratorIndex = 0;
-            advanceToNext();
-        }
-
-        @Override
-        public boolean hasNext() {
-            return null != nextItem;
-        }
-
-        @Override
-        public V next() {
-            if (null == nextItem) throw new NoSuchElementException();
-            V tmp = nextItem;
-            advanceToNext();
-            return tmp;
-        }
-
-        private void advanceToNext() {
-            nextItem = null;
-
-            do {
-                if (iteratorIndex >= baseIterators.length)
-                    return;
-
-                if (baseIterators[iteratorIndex].hasNext()) {
-                    nextItem = baseIterators[iteratorIndex].next();
-                    return;
-                }
-
-                iteratorIndex++;
-            } while (true);
-        }
+        return StringFactory.graphStrategyString(this);
     }
 }

@@ -2,7 +2,7 @@ package com.tinkerpop.gremlin.process.graph.step.map;
 
 import com.tinkerpop.gremlin.LoadGraphWith;
 import com.tinkerpop.gremlin.process.AbstractGremlinProcessTest;
-import com.tinkerpop.gremlin.process.SimpleTraverser;
+import com.tinkerpop.gremlin.process.traversers.SimpleTraverser;
 import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.process.Traverser;
 import com.tinkerpop.gremlin.process.graph.step.map.match.Bindings;
@@ -688,7 +688,7 @@ public abstract class MatchTest extends AbstractGremlinProcessTest {
         public Traversal<Vertex, String> get_g_V_out_out_matchXa_0created_b__b_0knows_cX_selectXcX_outXcreatedX_name() {
             return g.V().out().out().match("a",
                     g.of().as("a").in("created").as("b"),
-                    g.of().as("b").in("knows").as("c")).select("c").out("created").value("name");
+                    g.of().as("b").in("knows").as("c")).select("c").out("created").values("name");
         }
 
         @Override
@@ -844,7 +844,7 @@ public abstract class MatchTest extends AbstractGremlinProcessTest {
         public Traversal<Vertex, String> get_g_V_out_out_matchXa_0created_b__b_0knows_cX_selectXcX_outXcreatedX_name() {
             return (Traversal) g.V().out().out().match("a",
                     g.of().as("a").in("created").as("b"),
-                    g.of().as("b").in("knows").as("c")).select("c").out("created").value("name").submit(g.compute());
+                    g.of().as("b").in("knows").as("c")).select("c").out("created").values("name").submit(g.compute());
         }
 
         @Override
@@ -999,7 +999,7 @@ public abstract class MatchTest extends AbstractGremlinProcessTest {
 
     private <S, E> List<Bindings<E>> toBindings(final Traversal<S, Map<String, E>> traversal) {
         List<Bindings<E>> result = new LinkedList<>();
-        traversal.forEach(o -> {
+        traversal.forEachRemaining(o -> {
             result.add(new Bindings<>(o));
         });
         return result;

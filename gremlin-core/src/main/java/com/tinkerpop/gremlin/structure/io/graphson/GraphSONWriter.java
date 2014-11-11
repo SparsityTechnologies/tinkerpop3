@@ -21,7 +21,7 @@ import java.io.OutputStreamWriter;
  * Further note that serialized {@code Map} objects do not support complex types for keys.  {@link Edge} and
  * {@link Vertex} objects are serialized to {@code Map} instances. If an
  * {@link com.tinkerpop.gremlin.structure.Element} is used as a key, it is coerced to its identifier.  Other complex
- * objects are converted via {@link Object#toString()}.
+ * objects are converted via {@link Object#toString()} unless a custom serializer is supplied.
  *
  * @author Stephen Mallette (http://stephen.genoprime.com)
  */
@@ -110,6 +110,9 @@ public class GraphSONWriter implements GraphWriter {
             return this;
         }
 
+        /**
+         * Set to true in order to embed data types into the JSON so as to explicitly preserve data types.
+         */
         public Builder embedTypes(final boolean embedTypes) {
             this.embedTypes = embedTypes;
             return this;
@@ -132,7 +135,7 @@ public class GraphSONWriter implements GraphWriter {
                     .customModule(custom)
                     .loadCustomModules(loadCustomModules)
                     .normalize(normalize)
-                    .embedTypes(embedTypes).build();
+                    .embedTypes(embedTypes).create();
             return new GraphSONWriter(mapper);
         }
     }

@@ -1,25 +1,16 @@
 package com.tinkerpop.gremlin.structure.strategy;
 
 import com.tinkerpop.gremlin.AbstractGremlinTest;
-import com.tinkerpop.gremlin.FeatureRequirementSet;
 import com.tinkerpop.gremlin.LoadGraphWith;
-import com.tinkerpop.gremlin.process.T;
 import com.tinkerpop.gremlin.structure.Edge;
-import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
-import com.tinkerpop.gremlin.structure.VertexProperty;
-import com.tinkerpop.gremlin.structure.util.StringFactory;
 import org.junit.Test;
 
 import java.util.NoSuchElementException;
 import java.util.function.Predicate;
 
 import static com.tinkerpop.gremlin.LoadGraphWith.GraphData.MODERN;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 /**
  * @author Joshua Shinavier (http://fortytwo.net)
@@ -35,7 +26,7 @@ public class SubgraphStrategyTest extends AbstractGremlinTest {
 
         final GraphStrategy strategyToTest = new SubgraphStrategy(vertexCriterion, edgeCriterion);
         final StrategyWrappedGraph sg = new StrategyWrappedGraph(g);
-        sg.strategy().setGraphStrategy(strategyToTest);
+        sg.getStrategy().setGraphStrategy(strategyToTest);
 
         // three vertices are included in the subgraph
         assertEquals(6, g.V().count().next().longValue());
@@ -83,14 +74,12 @@ public class SubgraphStrategyTest extends AbstractGremlinTest {
 
         // with label and branch factor
 
-        assertEquals(1, g.v(convertToVertexId("josh")).outE(1, "created").count().next().longValue());
-        assertEquals(1, sg.v(convertToVertexId("josh")).outE(1, "created").count().next().longValue());
-        assertEquals(1, g.v(convertToVertexId("josh")).out(1, "created").count().next().longValue());
-        assertEquals(1, sg.v(convertToVertexId("josh")).out(1, "created").count().next().longValue());
-        assertEquals(1, g.v(convertToVertexId("josh")).bothE(1, "created").count().next().longValue());
-        assertEquals(1, sg.v(convertToVertexId("josh")).bothE(1, "created").count().next().longValue());
-        assertEquals(1, g.v(convertToVertexId("josh")).both(1, "created").count().next().longValue());
-        assertEquals(1, sg.v(convertToVertexId("josh")).both(1, "created").count().next().longValue());
+        assertEquals(1, g.v(convertToVertexId("josh")).outE("created").localLimit(1).count().next().longValue());
+        assertEquals(1, sg.v(convertToVertexId("josh")).outE("created").localLimit(1).count().next().longValue());
+        assertEquals(1, g.v(convertToVertexId("josh")).outE("created").localLimit(1).count().next().longValue());
+        assertEquals(1, sg.v(convertToVertexId("josh")).outE("created").localLimit(1).count().next().longValue());
+        assertEquals(1, g.v(convertToVertexId("josh")).bothE("created").localLimit(1).count().next().longValue());
+        assertEquals(1, sg.v(convertToVertexId("josh")).bothE("created").localLimit(1).count().next().longValue());
 
         // from edge
 
@@ -133,7 +122,7 @@ public class SubgraphStrategyTest extends AbstractGremlinTest {
 
         final GraphStrategy strategyToTest = new SubgraphStrategy(vertexCriterion, edgeCriterion);
         final StrategyWrappedGraph sg = new StrategyWrappedGraph(g);
-        sg.strategy().setGraphStrategy(strategyToTest);
+        sg.getStrategy().setGraphStrategy(strategyToTest);
 
         // all vertices are here
         assertEquals(6, g.V().count().next().longValue());
@@ -191,14 +180,14 @@ public class SubgraphStrategyTest extends AbstractGremlinTest {
 
         // with branch factor
 
-        assertEquals(1, g.v(convertToVertexId("josh")).bothE(1).count().next().longValue());
-        assertEquals(1, sg.v(convertToVertexId("josh")).bothE(1).count().next().longValue());
-        assertEquals(1, g.v(convertToVertexId("josh")).both(1).count().next().longValue());
-        assertEquals(1, sg.v(convertToVertexId("josh")).both(1).count().next().longValue());
-        assertEquals(1, g.v(convertToVertexId("josh")).bothE(1, "knows", "created").count().next().longValue());
-        assertEquals(1, sg.v(convertToVertexId("josh")).bothE(1, "knows", "created").count().next().longValue());
-        assertEquals(1, g.v(convertToVertexId("josh")).both(1, "knows", "created").count().next().longValue());
-        assertEquals(1, sg.v(convertToVertexId("josh")).both(1, "knows", "created").count().next().longValue());
+        assertEquals(1, g.v(convertToVertexId("josh")).bothE().localLimit(1).count().next().longValue());
+        assertEquals(1, sg.v(convertToVertexId("josh")).bothE().localLimit(1).count().next().longValue());
+        assertEquals(1, g.v(convertToVertexId("josh")).bothE().localLimit(1).inV().count().next().longValue());
+        assertEquals(1, sg.v(convertToVertexId("josh")).bothE().localLimit(1).inV().count().next().longValue());
+        assertEquals(1, g.v(convertToVertexId("josh")).bothE("knows", "created").localLimit(1).count().next().longValue());
+        assertEquals(1, sg.v(convertToVertexId("josh")).bothE("knows", "created").localLimit(1).count().next().longValue());
+        assertEquals(1, g.v(convertToVertexId("josh")).bothE("knows", "created").localLimit(1).inV().count().next().longValue());
+        assertEquals(1, sg.v(convertToVertexId("josh")).bothE("knows", "created").localLimit(1).inV().count().next().longValue());
 
         // from edge
 
@@ -226,7 +215,7 @@ public class SubgraphStrategyTest extends AbstractGremlinTest {
 
         final GraphStrategy strategyToTest = new SubgraphStrategy(vertexCriterion, edgeCriterion);
         final StrategyWrappedGraph sg = new StrategyWrappedGraph(g);
-        sg.strategy().setGraphStrategy(strategyToTest);
+        sg.getStrategy().setGraphStrategy(strategyToTest);
 
         // three vertices are included in the subgraph
         assertEquals(6, g.V().count().next().longValue());
@@ -275,14 +264,14 @@ public class SubgraphStrategyTest extends AbstractGremlinTest {
 
         // with branch factor
 
-        assertEquals(1, g.v(convertToVertexId("josh")).bothE(1).count().next().longValue());
-        assertEquals(1, sg.v(convertToVertexId("josh")).bothE(1).count().next().longValue());
-        assertEquals(1, g.v(convertToVertexId("josh")).both(1).count().next().longValue());
-        assertEquals(1, sg.v(convertToVertexId("josh")).both(1).count().next().longValue());
-        assertEquals(1, g.v(convertToVertexId("josh")).bothE(1, "knows", "created").count().next().longValue());
-        assertEquals(1, sg.v(convertToVertexId("josh")).bothE(1, "knows", "created").count().next().longValue());
-        assertEquals(1, g.v(convertToVertexId("josh")).both(1, "knows", "created").count().next().longValue());
-        assertEquals(1, sg.v(convertToVertexId("josh")).both(1, "knows", "created").count().next().longValue());
+        assertEquals(1, g.v(convertToVertexId("josh")).bothE().localLimit(1).count().next().longValue());
+        assertEquals(1, sg.v(convertToVertexId("josh")).bothE().localLimit(1).count().next().longValue());
+        assertEquals(1, g.v(convertToVertexId("josh")).bothE().localLimit(1).inV().count().next().longValue());
+        assertEquals(1, sg.v(convertToVertexId("josh")).bothE().localLimit(1).inV().count().next().longValue());
+        assertEquals(1, g.v(convertToVertexId("josh")).bothE("knows", "created").localLimit(1).count().next().longValue());
+        assertEquals(1, sg.v(convertToVertexId("josh")).bothE("knows", "created").localLimit(1).count().next().longValue());
+        assertEquals(1, g.v(convertToVertexId("josh")).bothE("knows", "created").localLimit(1).inV().count().next().longValue());
+        assertEquals(1, sg.v(convertToVertexId("josh")).bothE("knows", "created").localLimit(1).inV().count().next().longValue());
 
         // from edge
 
@@ -303,7 +292,7 @@ public class SubgraphStrategyTest extends AbstractGremlinTest {
 
         final GraphStrategy strategyToTest = new SubgraphStrategy(vertexCriterion, edgeCriterion);
         final StrategyWrappedGraph sg = new StrategyWrappedGraph(g);
-        sg.strategy().setGraphStrategy(strategyToTest);
+        sg.getStrategy().setGraphStrategy(strategyToTest);
 
         sg.v(convertToVertexId("marko"));
     }
@@ -327,7 +316,7 @@ public class SubgraphStrategyTest extends AbstractGremlinTest {
 
         final GraphStrategy strategyToTest = new SubgraphStrategy(vertexCriterion, edgeCriterion);
         final StrategyWrappedGraph sg = new StrategyWrappedGraph(g);
-        sg.strategy().setGraphStrategy(strategyToTest);
+        sg.getStrategy().setGraphStrategy(strategyToTest);
 
         sg.e(sg.e(convertToEdgeId("marko", "knows", "vadas")));
     }

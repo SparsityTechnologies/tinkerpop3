@@ -8,6 +8,7 @@ import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.VertexProperty;
 import com.tinkerpop.gremlin.structure.io.GraphReader;
 import com.tinkerpop.gremlin.structure.util.batch.BatchGraph;
 import com.tinkerpop.gremlin.structure.util.detached.DetachedEdge;
@@ -141,24 +142,12 @@ public class KryoReader implements GraphReader {
                 while (!input.eof()) {
                     final List<Object> vertexArgs = new ArrayList<>();
                     final DetachedVertex current = (DetachedVertex) kryo.readClassAndObject(input);
-                    vertexArgs.addAll(Arrays.asList(T.id, current.id()));
-                    vertexArgs.addAll(Arrays.asList(T.label, current.label()));
+                    appendToArgList(vertexArgs, T.id, current.id());
+                    appendToArgList(vertexArgs, T.label, current.label());
 
                     final Vertex v = graph.addVertex(vertexArgs.toArray());
-
-                    current.iterators().propertyIterator().forEachRemaining(p -> {
-                        final List<Object> propertyArgs = new ArrayList<>();
-                        p.iterators().propertyIterator().forEachRemaining(it -> propertyArgs.addAll(Arrays.asList(it.key(), it.value())));
-                        p.iterators().hiddenPropertyIterator().forEachRemaining(it -> propertyArgs.addAll(Arrays.asList(Graph.Key.hide(it.key()), it.value())));
-                        v.property(p.key(), p.value(), propertyArgs.toArray());
-                    });
-
-                    current.iterators().hiddenPropertyIterator().forEachRemaining(p -> {
-                        final List<Object> propertyArgs = new ArrayList<>();
-                        p.iterators().propertyIterator().forEachRemaining(it -> propertyArgs.addAll(Arrays.asList(it.key(), it.value())));
-                        p.iterators().hiddenPropertyIterator().forEachRemaining(it -> propertyArgs.addAll(Arrays.asList(Graph.Key.hide(it.key()), it.value())));
-                        v.property(Graph.Key.hide(p.key()), p.value(), propertyArgs.toArray());
-                    });
+                    current.iterators().propertyIterator().forEachRemaining(p -> createVertexProperty(graphToWriteTo, v, p, false));
+                    current.iterators().hiddenPropertyIterator().forEachRemaining(p -> createVertexProperty(graphToWriteTo, v, p, true));
 
                     // the gio file should have been written with a direction specified
                     final boolean hasDirectionSpecified = input.readBoolean();
@@ -193,6 +182,20 @@ public class KryoReader implements GraphReader {
         } finally {
             deleteTempFileSilently();
         }
+    }
+
+    private static void createVertexProperty(final Graph graphToWriteTo, final Vertex v, final VertexProperty<Object> p, final boolean hidden) {
+        final List<Object> propertyArgs = new ArrayList<>();
+        if (graphToWriteTo.features().vertex().properties().supportsUserSuppliedIds())
+            appendToArgList(propertyArgs, T.id, p.id());
+        p.iterators().propertyIterator().forEachRemaining(it -> appendToArgList(propertyArgs, it.key(), it.value()));
+        p.iterators().hiddenPropertyIterator().forEachRemaining(it -> appendToArgList(propertyArgs, Graph.Key.hide(it.key()), it.value()));
+        v.property(hidden ? Graph.Key.hide(p.key()) : p.key(), p.value(), propertyArgs.toArray());
+    }
+
+    private static void appendToArgList(final List<Object> propertyArgs, final Object key, final Object val) {
+        propertyArgs.add(key);
+        propertyArgs.add(val);
     }
 
     private Vertex readVertex(final Direction directionRequested, final Function<DetachedVertex, Vertex> vertexMaker,
@@ -297,7 +300,7 @@ public class KryoReader implements GraphReader {
                 detachedEdge.iterators().propertyIterator().forEachRemaining(p -> edgeArgs.addAll(Arrays.asList(p.key(), p.value())));
                 detachedEdge.iterators().hiddenPropertyIterator().forEachRemaining(p -> edgeArgs.addAll(Arrays.asList(Graph.Key.hide(p.key()), p.value())));
 
-                edgeArgs.addAll(Arrays.asList(T.id, detachedEdge.id()));
+                appendToArgList(edgeArgs, T.id, detachedEdge.id());
 
                 vOut.addEdge(detachedEdge.label(), inV, edgeArgs.toArray());
 
@@ -336,21 +339,38 @@ public class KryoReader implements GraphReader {
             this.tempFile = new File(UUID.randomUUID() + ".tmp");
         }
 
+        /**
+         * Set the size between commits when reading into the {@link Graph} instance.  This value defaults to
+         * {@link BatchGraph#DEFAULT_BUFFER_SIZE}.
+         */
         public Builder batchSize(final long batchSize) {
             this.batchSize = batchSize;
             return this;
         }
 
+        /**
+         * Supply a custom {@link GremlinKryo} instance to use as the serializer for the {@code KryoWriter}.
+         */
         public Builder custom(final GremlinKryo gremlinKryo) {
             this.gremlinKryo = gremlinKryo;
             return this;
         }
 
+        /**
+         * The name of the key to supply to
+         * {@link com.tinkerpop.gremlin.structure.util.batch.BatchGraph.Builder#vertexIdKey} when reading data into
+         * the {@link Graph}.
+         */
         public Builder vertexIdKey(final String vertexIdKey) {
             this.vertexIdKey = vertexIdKey;
             return this;
         }
 
+        /**
+         * The name of the key to supply to
+         * {@link com.tinkerpop.gremlin.structure.util.batch.BatchGraph.Builder#edgeIdKey} when reading data into
+         * the {@link Graph}.
+         */
         public Builder edgeIdKey(final String edgeIdKey) {
             this.edgeIdKey = edgeIdKey;
             return this;
@@ -360,7 +380,7 @@ public class KryoReader implements GraphReader {
          * The reader requires a working directory to write temp files to.  If this value is not set, it will write
          * the temp file to the local directory.
          */
-        public Builder setWorkingDirectory(final String workingDirectory) {
+        public Builder workingDirectory(final String workingDirectory) {
             final File f = new File(workingDirectory);
             if (!f.exists() || !f.isDirectory())
                 throw new IllegalArgumentException("The workingDirectory is not a directory or does not exist");

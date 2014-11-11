@@ -7,6 +7,7 @@ import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
+import com.tinkerpop.gremlin.structure.util.ElementHelper;
 import com.tinkerpop.gremlin.structure.util.StringFactory;
 import com.tinkerpop.gremlin.util.StreamFactory;
 import org.javatuples.Pair;
@@ -54,7 +55,7 @@ public class DetachedEdge extends DetachedElement<Edge> implements Edge, Edge.It
     private DetachedEdge() {
     }
 
-    private DetachedEdge(final Edge edge) {
+    private DetachedEdge(final Edge edge, final boolean asReference) {
         super(edge);
 
         final Vertex outV = edge.iterators().vertexIterator(Direction.OUT).next();
@@ -65,8 +66,10 @@ public class DetachedEdge extends DetachedElement<Edge> implements Edge, Edge.It
         this.outVertex = new DetachedVertex(outV.id(), outV.label());
         this.inVertex = new DetachedVertex(inV.id(), inV.label());
 
-        edge.iterators().propertyIterator().forEachRemaining(p -> this.properties.put(p.key(), new ArrayList(Arrays.asList(p instanceof DetachedProperty ? p : new DetachedProperty(p, this)))));
-        edge.iterators().hiddenPropertyIterator().forEachRemaining(p -> this.properties.put(Graph.Key.hide(p.key()), new ArrayList(Arrays.asList(p instanceof DetachedProperty ? p : new DetachedProperty(p, this)))));
+        if (!asReference) {
+            edge.iterators().propertyIterator().forEachRemaining(p -> this.properties.put(p.key(), new ArrayList(Arrays.asList(p instanceof DetachedProperty ? p : new DetachedProperty(p, this)))));
+            edge.iterators().hiddenPropertyIterator().forEachRemaining(p -> this.properties.put(Graph.Key.hide(p.key()), new ArrayList(Arrays.asList(p instanceof DetachedProperty ? p : new DetachedProperty(p, this)))));
+        }
     }
 
     @Override
@@ -76,7 +79,7 @@ public class DetachedEdge extends DetachedElement<Edge> implements Edge, Edge.It
 
     @Override
     public Edge attach(final Vertex hostVertex) {
-        return StreamFactory.stream(hostVertex.iterators().edgeIterator(Direction.OUT, Integer.MAX_VALUE, this.label))
+        return StreamFactory.stream(hostVertex.iterators().edgeIterator(Direction.OUT, this.label))
                 .filter(edge -> edge.equals(this))
                 .findAny().orElseThrow(() -> new IllegalStateException("The detached edge could not be be found incident to the provided vertex: " + this));
     }
@@ -87,8 +90,12 @@ public class DetachedEdge extends DetachedElement<Edge> implements Edge, Edge.It
     }
 
     public static DetachedEdge detach(final Edge edge) {
+        return detach(edge, false);
+    }
+
+    public static DetachedEdge detach(final Edge edge, final boolean asReference) {
         if (null == edge) throw Graph.Exceptions.argumentCanNotBeNull("edge");
-        return (edge instanceof DetachedEdge) ? (DetachedEdge) edge : new DetachedEdge(edge);
+        return (edge instanceof DetachedEdge) ? (DetachedEdge) edge : new DetachedEdge(edge, asReference);
     }
 
     public static Edge addTo(final Graph graph, final DetachedEdge detachedEdge) {
@@ -110,6 +117,15 @@ public class DetachedEdge extends DetachedElement<Edge> implements Edge, Edge.It
         }
         if (null == inV) {
             inV = graph.addVertex(T.id, detachedEdge.inVertex.id());
+        }
+
+        if (ElementHelper.areEqual(outV,inV)) {
+            final Iterator<Edge> itty = outV.iterators().edgeIterator(Direction.OUT, detachedEdge.label());
+            while (itty.hasNext()) {
+                final Edge e = itty.next();
+                if (ElementHelper.areEqual(detachedEdge, e))
+                    return e;
+            }
         }
 
         final Edge e = outV.addEdge(detachedEdge.label(), inV, T.id, detachedEdge.id());

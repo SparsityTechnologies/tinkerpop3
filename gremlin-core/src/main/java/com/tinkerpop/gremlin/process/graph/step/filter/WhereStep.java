@@ -2,9 +2,9 @@ package com.tinkerpop.gremlin.process.graph.step.filter;
 
 import com.tinkerpop.gremlin.process.Step;
 import com.tinkerpop.gremlin.process.Traversal;
-import com.tinkerpop.gremlin.process.util.SingleIterator;
+import com.tinkerpop.gremlin.process.TraversalEngine;
+import com.tinkerpop.gremlin.process.TraversalStrategies;
 import com.tinkerpop.gremlin.process.util.TraversalHelper;
-import com.tinkerpop.gremlin.process.util.TraverserIterator;
 
 import java.util.Map;
 import java.util.function.BiPredicate;
@@ -60,7 +60,7 @@ public final class WhereStep<E> extends FilterStep<Map<String, E>> {
             } else
                 endObject = null;
 
-            startStep.addStarts(new TraverserIterator<>(startStep, TraversalHelper.trackPaths(constraint), new SingleIterator<>(startObject)));
+            startStep.addStart(TraversalStrategies.GlobalCache.getStrategies(constraint.getClass()).getTraverserGenerator(constraint, TraversalEngine.STANDARD).generate(startObject, startStep));
             if (null == endObject) {
                 if (constraint.hasNext()) {
                     constraint.reset();

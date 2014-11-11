@@ -1,7 +1,7 @@
 package com.tinkerpop.gremlin.process.graph.step.sideEffect;
 
-import com.tinkerpop.gremlin.AbstractGremlinTest;
 import com.tinkerpop.gremlin.LoadGraphWith;
+import com.tinkerpop.gremlin.process.AbstractGremlinProcessTest;
 import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.structure.Vertex;
 import org.junit.Test;
@@ -19,7 +19,7 @@ import static org.junit.Assert.assertFalse;
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  * @author Stephen Mallette (http://stephen.genoprime.com)
  */
-public abstract class GroupCountTest extends AbstractGremlinTest {
+public abstract class GroupCountTest extends AbstractGremlinProcessTest {
 
     public abstract Traversal<Vertex, Map<Object, Long>> get_g_V_outXcreatedX_groupCountXnameX();
 
@@ -95,12 +95,12 @@ public abstract class GroupCountTest extends AbstractGremlinTest {
 
         @Override
         public Traversal<Vertex, Map<Object, Long>> get_g_V_outXcreatedX_name_groupCount() {
-            return (Traversal) g.V().out("created").value("name").groupCount();
+            return (Traversal) g.V().out("created").values("name").groupCount();
         }
 
         @Override
         public Traversal<Vertex, Map<Object, Long>> get_g_V_outXcreatedX_name_groupCountXaX() {
-            return (Traversal) g.V().out("created").value("name").groupCount("a");
+            return (Traversal) g.V().out("created").values("name").groupCount("a");
         }
 
         @Override
@@ -124,6 +124,9 @@ public abstract class GroupCountTest extends AbstractGremlinTest {
     }
 
     public static class ComputerTest extends GroupCountTest {
+        public ComputerTest() {
+            requiresGraphComputer = true;
+        }
 
         @Override
         public Traversal<Vertex, Map<Object, Long>> get_g_V_outXcreatedX_groupCountXnameX() {
@@ -132,12 +135,12 @@ public abstract class GroupCountTest extends AbstractGremlinTest {
 
         @Override
         public Traversal<Vertex, Map<Object, Long>> get_g_V_outXcreatedX_name_groupCount() {
-            return (Traversal) g.V().out("created").value("name").groupCount().submit(g.compute());
+            return (Traversal) g.V().out("created").values("name").groupCount().submit(g.compute());
         }
 
         @Override
         public Traversal<Vertex, Map<Object, Long>> get_g_V_outXcreatedX_name_groupCountXaX() {
-            return (Traversal) g.V().out("created").value("name").groupCount("a").submit(g.compute());
+            return (Traversal) g.V().out("created").values("name").groupCount("a").submit(g.compute());
         }
 
         @Override

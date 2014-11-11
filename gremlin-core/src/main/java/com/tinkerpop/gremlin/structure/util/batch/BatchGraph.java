@@ -2,9 +2,7 @@ package com.tinkerpop.gremlin.structure.util.batch;
 
 import com.tinkerpop.gremlin.process.T;
 import com.tinkerpop.gremlin.process.Traversal;
-import com.tinkerpop.gremlin.process.Traverser;
 import com.tinkerpop.gremlin.process.computer.GraphComputer;
-import com.tinkerpop.gremlin.process.graph.ElementTraversal;
 import com.tinkerpop.gremlin.process.graph.GraphTraversal;
 import com.tinkerpop.gremlin.process.graph.VertexTraversal;
 import com.tinkerpop.gremlin.structure.Direction;
@@ -17,6 +15,8 @@ import com.tinkerpop.gremlin.structure.Vertex;
 import com.tinkerpop.gremlin.structure.VertexProperty;
 import com.tinkerpop.gremlin.structure.util.ElementHelper;
 import com.tinkerpop.gremlin.structure.util.batch.cache.VertexCache;
+import org.apache.commons.configuration.BaseConfiguration;
+import org.apache.commons.configuration.Configuration;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -52,7 +52,7 @@ import java.util.function.Function;
  */
 public class BatchGraph<G extends Graph> implements Graph {
     /**
-     * Default buffer size
+     * Default buffer size is 10000.
      */
     public static final long DEFAULT_BUFFER_SIZE = 10000;
 
@@ -248,6 +248,11 @@ public class BatchGraph<G extends Graph> implements Graph {
     }
 
     @Override
+    public Configuration configuration() {
+        return new BaseConfiguration();
+    }
+
+    @Override
     public Features features() {
         return this.batchFeatures;
     }
@@ -416,6 +421,16 @@ public class BatchGraph<G extends Graph> implements Graph {
         }
 
         @Override
+        public <V> VertexProperty<V> property(final String key, final V value, final Object... keyValues) {
+            return getCachedVertex(externalID).property(key, value, keyValues);
+        }
+
+        @Override
+        public <V> VertexProperty<V> singleProperty(final String key, final V value, final Object... keyValues) {
+            return getCachedVertex(externalID).singleProperty(key, value, keyValues);
+        }
+
+        @Override
         public <V> VertexProperty<V> property(final String key) {
             return getCachedVertex(externalID).property(key);
         }
@@ -442,12 +457,12 @@ public class BatchGraph<G extends Graph> implements Graph {
         }
 
         @Override
-        public Iterator<Edge> edgeIterator(final Direction direction, final int branchFactor, final String... labels) {
+        public Iterator<Edge> edgeIterator(final Direction direction, final String... edgeLabels) {
             throw retrievalNotSupported();
         }
 
         @Override
-        public Iterator<Vertex> vertexIterator(final Direction direction, final int branchFactor, final String... labels) {
+        public Iterator<Vertex> vertexIterator(final Direction direction, final String... labels) {
             throw retrievalNotSupported();
         }
 
@@ -581,6 +596,9 @@ public class BatchGraph<G extends Graph> implements Graph {
             return this;
         }
 
+        /**
+         * Number of mutations to perform between calls to {@link com.tinkerpop.gremlin.structure.Transaction#commit}.
+         */
         public Builder bufferSize(long bufferSize) {
             if (bufferSize <= 0) throw new IllegalArgumentException("BufferSize must be positive");
             this.bufferSize = bufferSize;

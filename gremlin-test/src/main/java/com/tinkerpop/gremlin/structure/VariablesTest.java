@@ -29,6 +29,7 @@ import static org.junit.Assume.assumeThat;
  * @author Stephen Mallette (http://stephen.genoprime.com)
  */
 @RunWith(Enclosed.class)
+@SuppressWarnings("ThrowableResultOfMethodCallIgnored")
 public class VariablesTest {
 
     /**
@@ -82,8 +83,7 @@ public class VariablesTest {
                 g.variables().set(key, val);
                 fail(String.format("Setting an annotation with these arguments [key: %s value: %s] should throw an exception", key, val));
             } catch (Exception ex) {
-                assertEquals(expectedException.getClass(), ex.getClass());
-                assertEquals(expectedException.getMessage(), ex.getMessage());
+                validateException(expectedException, ex);
             }
         }
     }
@@ -183,26 +183,28 @@ public class VariablesTest {
      */
     @RunWith(Parameterized.class)
     public static class GraphVariablesFeatureSupportTest extends AbstractGremlinTest {
-        private static final Map<String,Object> testMap = new HashMap<String,Object>() {{
-            put("testString", "try");
-            put("testInteger", 123);
-        }};
+        private static final Map<String,Object> testMap = new HashMap<>();
 
-        private static final ArrayList<Object> mixedList = new ArrayList<Object>() {{
-            add("try1");
-            add(2);
-        }};
+        private static final ArrayList<Object> mixedList = new ArrayList<>();
 
-        private static final ArrayList<String> uniformStringList = new ArrayList<String>() {{
-            add("try1");
-            add("try2");
-        }};
+        private static final ArrayList<String> uniformStringList = new ArrayList<>();
 
-        private static final ArrayList<Integer> uniformIntegerList = new ArrayList<Integer>() {{
-            add(100);
-            add(200);
-            add(300);
-        }};
+        private static final ArrayList<Integer> uniformIntegerList = new ArrayList<>();
+
+        static {
+            testMap.put("testString", "try");
+            testMap.put("testInteger", 123);
+
+            mixedList.add("try1");
+            mixedList.add(2);
+
+            uniformStringList.add("try1");
+            uniformStringList.add("try2");
+
+            uniformIntegerList.add(100);
+            uniformIntegerList.add(200);
+            uniformIntegerList.add(300);
+        }
 
         @Parameterized.Parameters(name = "{index}: supports{0}({1})")
         public static Iterable<Object[]> data() {
@@ -326,33 +328,6 @@ public class VariablesTest {
                 });
             else
                 tryCommit(g, graph -> assertEquals(value, variables.get("aKey").get()));
-        }
-    }
-
-    private static class MockSerializable implements Serializable {
-        private String testField;
-
-        public MockSerializable(final String testField) {
-            this.testField = testField;
-        }
-
-        public String getTestField() {
-            return this.testField;
-        }
-
-        public void setTestField(final String testField) {
-            this.testField = testField;
-        }
-
-        @Override
-        public boolean equals(Object oth) {
-            if (this == oth) return true;
-            else if (oth == null) return false;
-            else if (!getClass().isInstance(oth)) return false;
-            MockSerializable m = (MockSerializable) oth;
-            if (testField == null) {
-                return (m.testField == null);
-            } else return testField.equals(m.testField);
         }
     }
 }

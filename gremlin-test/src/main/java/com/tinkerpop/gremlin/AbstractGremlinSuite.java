@@ -174,7 +174,8 @@ public abstract class AbstractGremlinSuite extends Suite {
 
         public OptOutTestFilter(final Graph.OptOut[] optOuts) {
             testsToIgnore = Arrays.stream(optOuts)
-                    .<Description>map(ignoreTest -> Description.createTestDescription(ignoreTest.test(), ignoreTest.method()))
+                    .<Pair>map(ignoreTest -> Pair.with(ignoreTest.test(), ignoreTest.specific().isEmpty() ? ignoreTest.method() : String.format("%s[%s]", ignoreTest.method(), ignoreTest.specific())))
+                    .<Description>map(p -> Description.createTestDescription(p.getValue0().toString(), p.getValue1().toString()))
                     .collect(Collectors.toList());
         }
 

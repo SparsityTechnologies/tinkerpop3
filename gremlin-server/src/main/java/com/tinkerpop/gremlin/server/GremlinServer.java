@@ -12,6 +12,8 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.concurrent.DefaultEventExecutorGroup;
 import io.netty.util.concurrent.EventExecutorGroup;
+import io.netty.util.internal.logging.InternalLoggerFactory;
+import io.netty.util.internal.logging.Slf4JLoggerFactory;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +29,12 @@ import java.util.concurrent.ScheduledExecutorService;
  * @author Stephen Mallette (http://stephen.genoprime.com)
  */
 public class GremlinServer {
+
+    static {
+        // hook slf4j up to netty internal logging
+        InternalLoggerFactory.setDefaultFactory(new Slf4JLoggerFactory());
+    }
+
     private static final Logger logger = LoggerFactory.getLogger(GremlinServer.class);
     private final Settings settings;
     private Optional<Graphs> graphs = Optional.empty();
@@ -72,7 +80,7 @@ public class GremlinServer {
             ch = b.bind(settings.host, settings.port).sync().channel();
             logger.info("Gremlin Server configured with worker thread pool of {} and boss thread pool of {}",
                     settings.threadPoolWorker, settings.threadPoolBoss);
-            logger.info("Websocket channel started at port {}.", settings.port);
+            logger.info("Channel started at port {}.", settings.port);
 
             serverReady.ifPresent(future -> future.complete(null));
 
@@ -144,7 +152,7 @@ public class GremlinServer {
     }
 
     public static void main(final String[] args) throws Exception {
-        // add to vm options: -Dlog4j.configuration=file:config/log4j.properties
+        // add to vm options: -Dlog4j.configuration=file:conf/log4j.properties
         printHeader();
         final String file;
         if (args.length > 0)
@@ -176,19 +184,36 @@ public class GremlinServer {
 
     private static void configureMetrics(final Settings.ServerMetrics settings) {
         final MetricManager metrics = MetricManager.INSTANCE;
-        settings.optionalConsoleReporter().ifPresent(config -> metrics.addConsoleReporter(config.interval));
-        settings.optionalCsvReporter().ifPresent(config -> metrics.addCsvReporter(config.interval, config.fileName));
-        settings.optionalJmxReporter().ifPresent(config -> metrics.addJmxReporter(config.domain, config.agentId));
-        settings.optionalSlf4jReporter().ifPresent(config -> metrics.addSlf4jReporter(config.interval, config.loggerName));
+        settings.optionalConsoleReporter().ifPresent(config -> {
+            if (config.enabled) metrics.addConsoleReporter(config.interval);
+        });
+
+        settings.optionalCsvReporter().ifPresent(config -> {
+            if (config.enabled) metrics.addCsvReporter(config.interval, config.fileName);
+        });
+
+        settings.optionalJmxReporter().ifPresent(config -> {
+            if (config.enabled) metrics.addJmxReporter(config.domain, config.agentId);
+        });
+
+        settings.optionalSlf4jReporter().ifPresent(config -> {
+            if (config.enabled) metrics.addSlf4jReporter(config.interval, config.loggerName);
+        });
+
         settings.optionalGangliaReporter().ifPresent(config -> {
-            try {
-                metrics.addGangliaReporter(config.host, config.port,
-                        config.optionalAddressingMode(), config.ttl, config.protocol31, config.hostUUID, config.spoof, config.interval);
-            } catch (IOException ioe) {
-                logger.warn("Error configuring the Ganglia Reporter.", ioe);
+            if (config.enabled) {
+                try {
+                    metrics.addGangliaReporter(config.host, config.port,
+                            config.optionalAddressingMode(), config.ttl, config.protocol31, config.hostUUID, config.spoof, config.interval);
+                } catch (IOException ioe) {
+                    logger.warn("Error configuring the Ganglia Reporter.", ioe);
+                }
             }
         });
-        settings.optionalGraphiteReporter().ifPresent(config -> metrics.addGraphiteReporter(config.host, config.port, config.prefix, config.interval));
+
+        settings.optionalGraphiteReporter().ifPresent(config -> {
+            if (config.enabled) metrics.addGraphiteReporter(config.host, config.port, config.prefix, config.interval);
+        });
     }
 
     private static void printHeader() {

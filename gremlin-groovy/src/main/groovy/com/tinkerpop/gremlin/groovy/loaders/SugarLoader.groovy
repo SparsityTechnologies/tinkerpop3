@@ -1,7 +1,7 @@
 package com.tinkerpop.gremlin.groovy.loaders
 
-import com.tinkerpop.gremlin.process.PathTraverser
-import com.tinkerpop.gremlin.process.SimpleTraverser
+import com.tinkerpop.gremlin.process.traversers.PathTraverser
+import com.tinkerpop.gremlin.process.traversers.SimpleTraverser
 import com.tinkerpop.gremlin.process.Traverser
 import com.tinkerpop.gremlin.process.graph.GraphTraversal
 import com.tinkerpop.gremlin.process.util.TraversalHelper
@@ -27,7 +27,7 @@ class SugarLoader {
         }
 
         GraphTraversal.metaClass.methodMissing = { final String name, final def args ->
-            ((GraphTraversal) delegate).value(name);
+            ((GraphTraversal) delegate).values(name);
         }
 
         Traverser.metaClass.mixin(TraverserCategory.class);
@@ -98,7 +98,7 @@ class SugarLoader {
         }
 
         public static final getAt(final GraphTraversal graphTraversal, final Integer index) {
-            graphTraversal.range(index, index);
+            graphTraversal.range(index, index+1);
         }
 
         public static final getAt(final GraphTraversal graphTraversal, final Range range) {

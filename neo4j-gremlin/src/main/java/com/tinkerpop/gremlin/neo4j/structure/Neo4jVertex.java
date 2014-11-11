@@ -7,6 +7,7 @@ import com.tinkerpop.gremlin.process.T;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.StartStep;
 import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
+import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.Vertex;
@@ -38,18 +39,9 @@ public class Neo4jVertex extends Neo4jElement implements Vertex, Vertex.Iterator
     public <V> VertexProperty<V> property(final String key) {
         this.graph.tx().readWrite();
         if (!this.graph.supportsMultiProperties) {
-            return this.getBaseVertex().hasProperty(key) ? new Neo4jVertexProperty<V>(this, key, (V) this.getBaseVertex().getProperty(key)) : VertexProperty.<V>empty();
+            return existsInNeo4j(key) ? new Neo4jVertexProperty<V>(this, key, (V) this.getBaseVertex().getProperty(key)) : VertexProperty.<V>empty();
         } else {
-            final boolean existsInNeo4j;
-            try {
-                existsInNeo4j = this.getBaseVertex().hasProperty(key);
-            } catch (IllegalStateException ise) {
-                return VertexProperty.<V>empty();
-            } catch (NotFoundException nfe) {
-                return VertexProperty.<V>empty();
-            }
-
-            if (existsInNeo4j) {
+            if (existsInNeo4j(key)) {
                 if (this.getBaseVertex().getProperty(key).equals(Neo4jVertexProperty.VERTEX_PROPERTY_TOKEN)) {
                     if (this.getBaseVertex().getDegree(DynamicRelationshipType.withName(Neo4jVertexProperty.VERTEX_PROPERTY_PREFIX.concat(key)), org.neo4j.graphdb.Direction.OUTGOING) > 1)
                         throw Vertex.Exceptions.multiplePropertiesExistForProvidedKey(key);
@@ -103,7 +95,6 @@ public class Neo4jVertex extends Neo4jElement implements Vertex, Vertex.Iterator
     }
 
     @Override
-    // TODO: remove if VertexPropertyTest works with a setProperty() bug in Neo4j fixed.
     public <V> VertexProperty<V> singleProperty(final String key, final V value, final Object... keyValues) {
         if (!this.graph.supportsMultiProperties) {
             this.getBaseVertex().setProperty(key, value);
@@ -136,6 +127,8 @@ public class Neo4jVertex extends Neo4jElement implements Vertex, Vertex.Iterator
 
     @Override
     public void remove() {
+        if (this.removed) throw Element.Exceptions.elementAlreadyRemoved(Vertex.class, this.getBaseVertex().getId());
+        this.removed = true;
         this.graph.tx().readWrite();
         try {
             final Node node = this.getBaseVertex();
@@ -198,15 +191,15 @@ public class Neo4jVertex extends Neo4jElement implements Vertex, Vertex.Iterator
     }
 
     @Override
-    public Iterator<Vertex> vertexIterator(final Direction direction, final int branchFactor, final String... labels) {
+    public Iterator<Vertex> vertexIterator(final Direction direction, final String... labels) {
         graph.tx().readWrite();
-        return (Iterator) StreamFactory.stream(Neo4jHelper.getVertices(Neo4jVertex.this, direction, labels)).limit(branchFactor).iterator();
+        return (Iterator) Neo4jHelper.getVertices(Neo4jVertex.this, direction, labels).iterator();
     }
 
     @Override
-    public Iterator<Edge> edgeIterator(final Direction direction, final int branchFactor, final String... labels) {
+    public Iterator<Edge> edgeIterator(final Direction direction, final String... edgeLabels) {
         graph.tx().readWrite();
-        return (Iterator) StreamFactory.stream(Neo4jHelper.getEdges(Neo4jVertex.this, direction, labels)).limit(branchFactor).iterator();
+        return (Iterator) Neo4jHelper.getEdges(Neo4jVertex.this, direction, edgeLabels).iterator();
     }
 
     @Override
@@ -237,5 +230,14 @@ public class Neo4jVertex extends Neo4jElement implements Vertex, Vertex.Iterator
                     else
                         return Stream.of(new Neo4jVertexProperty<>(Neo4jVertex.this, key, (V) getBaseVertex().getProperty(key)));
                 }).iterator();
+    }
+
+    private boolean existsInNeo4j(final String key) {
+        try {
+            return this.getBaseVertex().hasProperty(key);
+        } catch (IllegalStateException | NotFoundException ex) {
+            // if vertex is removed before/after transaction close
+            throw Element.Exceptions.elementAlreadyRemoved(Vertex.class, this.id());
+        }
     }
 }

@@ -6,6 +6,7 @@ import com.tinkerpop.gremlin.FeatureRequirement;
 import com.tinkerpop.gremlin.FeatureRequirementSet;
 import com.tinkerpop.gremlin.process.T;
 import com.tinkerpop.gremlin.util.StreamFactory;
+import com.tinkerpop.gremlin.util.function.FunctionUtils;
 import com.tinkerpop.gremlin.util.function.TriFunction;
 import org.javatuples.Pair;
 import org.junit.Test;
@@ -14,13 +15,13 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
@@ -49,6 +50,13 @@ public class VertexPropertyTest extends AbstractGremlinTest {
 
         @Test
         @FeatureRequirementSet(FeatureRequirementSet.Package.VERTICES_ONLY)
+        public void shouldSetLabelOfVertexPropertyToKeyOfOwningProperty() {
+            final Vertex v = g.addVertex("name", "stephen");
+            tryCommit(g, g -> assertEquals("name", v.property("name").label()));
+        }
+
+        @Test
+        @FeatureRequirementSet(FeatureRequirementSet.Package.VERTICES_ONLY)
         @FeatureRequirement(featureClass = Graph.Features.VertexFeatures.class, feature = Graph.Features.VertexFeatures.FEATURE_META_PROPERTIES)
         @FeatureRequirement(featureClass = Graph.Features.VertexFeatures.class, feature = Graph.Features.VertexFeatures.FEATURE_MULTI_PROPERTIES)
         @FeatureRequirement(featureClass = Graph.Features.VertexPropertyFeatures.class, feature = Graph.Features.VertexPropertyFeatures.FEATURE_INTEGER_VALUES)
@@ -71,11 +79,10 @@ public class VertexPropertyTest extends AbstractGremlinTest {
             try {
                 v.property("name");
                 fail("This should throw a: " + Vertex.Exceptions.multiplePropertiesExistForProvidedKey("name"));
-            } catch (final IllegalStateException e) {
-                assertEquals(Vertex.Exceptions.multiplePropertiesExistForProvidedKey("name").getMessage(), e.getMessage());
             } catch (final Exception e) {
-                fail("This should throw a: " + Vertex.Exceptions.multiplePropertiesExistForProvidedKey("name"));
+                validateException(Vertex.Exceptions.multiplePropertiesExistForProvidedKey("name"), e);
             }
+
             assertTrue(v.valueMap().next().get("name").contains("marko"));
             assertTrue(v.valueMap().next().get("name").contains("marko a. rodriguez"));
             assertEquals(3, v.properties().count().next().intValue());
@@ -96,7 +103,7 @@ public class VertexPropertyTest extends AbstractGremlinTest {
                 meta.get().property(Graph.Key.hide("counter"), meta.get().value().length());
             }).iterate();
             tryCommit(g, g -> {
-                v.properties().forEach(meta -> {
+                v.properties().forEachRemaining(meta -> {
                     assertEquals(meta.key(), meta.label());
                     assertTrue(meta.isPresent());
                     assertFalse(meta.isHidden());
@@ -168,10 +175,9 @@ public class VertexPropertyTest extends AbstractGremlinTest {
 
             final Vertex u = g.addVertex("name", "marko", "name", "marko a. rodriguez", "name", "marko rodriguez");
             tryCommit(g);
-            // TODO: Neo4j no happy long time ---- u.properties().remove();
+            u.properties().remove();
             u.singleProperty("name", "okram", "acl", "private", "date", 2014);
             tryCommit(g, g -> {
-                // u.properties().forEach(p -> System.out.println(p + "::" + p.properties().toList()));
                 assertEquals(1, u.properties("name").count().next().intValue());
                 assertEquals(1, u.properties().count().next().intValue());
                 assertEquals(2, u.property("name").valueMap().next().size());
@@ -200,6 +206,29 @@ public class VertexPropertyTest extends AbstractGremlinTest {
             b.property("name").remove();
             b.properties("name").remove();
             b.property("name").remove();
+        }
+
+        @Test
+        @FeatureRequirementSet(FeatureRequirementSet.Package.VERTICES_ONLY)
+        @FeatureRequirement(featureClass = Graph.Features.VertexFeatures.class, feature = Graph.Features.VertexFeatures.FEATURE_MULTI_PROPERTIES)
+        @FeatureRequirement(featureClass = Graph.Features.VertexFeatures.class, feature = Graph.Features.VertexFeatures.FEATURE_REMOVE_PROPERTY)
+        public void shouldAllowIteratingAndRemovingVertexPropertyProperties() {
+            final Vertex daniel = g.addVertex("name", "daniel", "name", "kuppitz", "name", "big d", "name", "the german");
+            daniel.properties("name")
+                    .sideEffect(vp -> vp.get().<Object>property("aKey", UUID.randomUUID().toString()))
+                    .sideEffect(vp -> vp.get().<Object>property("bKey", UUID.randomUUID().toString()))
+                    .sideEffect(vp -> vp.get().<Object>property("cKey", UUID.randomUUID().toString())).iterate();
+
+            assertEquals(4, daniel.properties().count().next().longValue());
+            assertEquals(12, daniel.properties().properties().count().next().longValue());
+
+            daniel.properties().properties().remove();
+            assertEquals(4, daniel.properties().count().next().longValue());
+            assertEquals(0, daniel.properties().properties().count().next().longValue());
+
+            daniel.properties().remove();
+            assertEquals(0, daniel.properties().count().next().longValue());
+            assertEquals(0, daniel.properties().properties().count().next().longValue());
         }
 
 
@@ -305,17 +334,43 @@ public class VertexPropertyTest extends AbstractGremlinTest {
                 assertEquals(0, g.E().count().next().intValue());
             });
         }
+    }
+
+    @RunWith(Parameterized.class)
+    @ExceptionCoverage(exceptionClass = Element.Exceptions.class, methods = {
+            "elementAlreadyRemoved"
+    })
+    public static class ExceptionConsistencyWhenVertexPropertyRemovedTest extends AbstractGremlinTest {
+
+        @Parameterized.Parameters(name = "{0}")
+        public static Iterable<Object[]> data() {
+            return Arrays.asList(new Object[][]{
+                    {"property(k)", FunctionUtils.wrapConsumer((VertexProperty p) -> p.property("year"))}});
+        }
+
+        @Parameterized.Parameter(value = 0)
+        public String name;
+
+        @Parameterized.Parameter(value = 1)
+        public Consumer<VertexProperty> functionToTest;
 
         @Test
-        @FeatureRequirementSet(FeatureRequirementSet.Package.VERTICES_ONLY)
-        @FeatureRequirement(featureClass = Graph.Features.VertexPropertyFeatures.class, feature = Graph.Features.VertexPropertyFeatures.FEATURE_REMOVE_PROPERTY)
+        @FeatureRequirement(featureClass = Graph.Features.VertexFeatures.class, feature = Graph.Features.VertexFeatures.FEATURE_ADD_VERTICES)
+        @FeatureRequirement(featureClass = Graph.Features.VertexFeatures.class, feature = Graph.Features.VertexFeatures.FEATURE_REMOVE_VERTICES)
         @FeatureRequirement(featureClass = Graph.Features.VertexFeatures.class, feature = Graph.Features.VertexFeatures.FEATURE_META_PROPERTIES)
-        public void shouldReturnEmptyPropertyIfEdgeWasRemoved() {
+        public void shouldThrowExceptionIfVertexPropertyWasRemoved() {
             final Vertex v1 = g.addVertex();
             final VertexProperty p = v1.property("name", "stephen", "year", "2012");
+            final Object id = p.id();
             p.remove();
-            final Property ip  = p.property("year");
-            tryCommit(g, g -> assertEquals(Property.empty(), ip));
+            tryCommit(g, g -> {
+                try {
+                    functionToTest.accept(p);
+                    fail("Should have thrown exception as the Vertex was already removed");
+                } catch (Exception ex) {
+                    validateException(Element.Exceptions.elementAlreadyRemoved(VertexProperty.class, id), ex);
+                }
+            });
         }
     }
 
@@ -350,8 +405,8 @@ public class VertexPropertyTest extends AbstractGremlinTest {
                 assertEquals(1, g.V().properties("name").properties("acl").count().next().intValue());
                 assertEquals("private", g.V().properties("age").properties("acl").value().next());
                 assertEquals("public", g.V().properties("name").properties("acl").value().next());
-                assertEquals("private", g.V().properties("age").value("acl").next());
-                assertEquals("public", g.V().properties("name").value("acl").next());
+                assertEquals("private", g.V().properties("age").values("acl").next());
+                assertEquals("public", g.V().properties("name").values("acl").next());
                 assertEquals(1, g.V().count().next().intValue());
                 assertEquals(0, g.E().count().next().intValue());
             });
@@ -359,8 +414,8 @@ public class VertexPropertyTest extends AbstractGremlinTest {
             v.property("age").property("acl", "public");
             v.property("age").property("changeDate", 2014);
             tryCommit(g, g -> {
-                assertEquals("public", g.V().properties("age").value("acl").next());
-                assertEquals(2014, g.V().properties("age").value("changeDate").next());
+                assertEquals("public", g.V().properties("age").values("acl").next());
+                assertEquals(2014, g.V().properties("age").values("changeDate").next());
                 assertEquals(1, v.properties("age").valueMap().count().next().intValue());
                 assertEquals(2, v.properties("age").valueMap().next().size());
                 assertTrue(v.properties("age").valueMap().next().containsKey("acl"));
@@ -386,7 +441,7 @@ public class VertexPropertyTest extends AbstractGremlinTest {
             });
 
             v.properties("i").sideEffect(m -> m.get().<Object>property("aKey", "aValue")).iterate();
-            v.properties("i").properties("aKey").forEach(p -> assertEquals("aValue", p.value()));
+            v.properties("i").properties("aKey").forEachRemaining(p -> assertEquals("aValue", p.value()));
             tryCommit(g, g -> {
                 assertEquals(3, v.properties("i").properties("aKey").count().next().intValue());
                 assertEquals(3, g.V().properties("i").properties("aKey").count().next().intValue());

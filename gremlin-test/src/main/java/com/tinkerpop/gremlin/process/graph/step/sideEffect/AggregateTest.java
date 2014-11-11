@@ -1,7 +1,7 @@
 package com.tinkerpop.gremlin.process.graph.step.sideEffect;
 
-import com.tinkerpop.gremlin.AbstractGremlinTest;
 import com.tinkerpop.gremlin.LoadGraphWith;
+import com.tinkerpop.gremlin.process.AbstractGremlinProcessTest;
 import com.tinkerpop.gremlin.process.Path;
 import com.tinkerpop.gremlin.process.Traversal;
 import com.tinkerpop.gremlin.process.util.MapHelper;
@@ -15,14 +15,15 @@ import java.util.Map;
 
 import static com.tinkerpop.gremlin.LoadGraphWith.GraphData.MODERN;
 import static org.junit.Assert.*;
+import static org.hamcrest.CoreMatchers.*;
 
 /**
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  * @author Stephen Mallette (http://stephen.genoprime.com)
  */
-public abstract class AggregateTest extends AbstractGremlinTest {
+public abstract class AggregateTest extends AbstractGremlinProcessTest {
 
-    public abstract Traversal<Vertex, List<String>> get_g_V_valueXnameX_aggregate();
+    public abstract Traversal<Vertex, List<String>> get_g_V_name_aggregate();
 
     public abstract Traversal<Vertex, List<String>> get_g_V_aggregateXnameX();
 
@@ -33,7 +34,7 @@ public abstract class AggregateTest extends AbstractGremlinTest {
     @Test
     @LoadGraphWith(MODERN)
     public void g_V_valueXnameX_aggregate() {
-        Traversal<Vertex, List<String>> traversal = get_g_V_valueXnameX_aggregate();
+        Traversal<Vertex, List<String>> traversal = get_g_V_name_aggregate();
         printTraversalForm(traversal);
         final Collection<String> names = traversal.next();
         assertFalse(traversal.hasNext());
@@ -73,7 +74,7 @@ public abstract class AggregateTest extends AbstractGremlinTest {
             Path path = traversal.next();
             String first = path.get(0).toString();
             String second = path.get(1).toString();
-            assertNotEquals(first, second);
+            assertThat(first, not(second));
             MapHelper.incr(firstStepCounts, first, 1l);
             MapHelper.incr(secondStepCounts, second, 1l);
         }
@@ -105,8 +106,8 @@ public abstract class AggregateTest extends AbstractGremlinTest {
     public static class StandardTest extends AggregateTest {
 
         @Override
-        public Traversal<Vertex, List<String>> get_g_V_valueXnameX_aggregate() {
-            return (Traversal) g.V().value("name").aggregate();
+        public Traversal<Vertex, List<String>> get_g_V_name_aggregate() {
+            return (Traversal) g.V().values("name").aggregate();
         }
 
         @Override
@@ -126,9 +127,13 @@ public abstract class AggregateTest extends AbstractGremlinTest {
 
     public static class ComputerTest extends AggregateTest {
 
+        public ComputerTest() {
+            requiresGraphComputer = true;
+        }
+
         @Override
-        public Traversal<Vertex, List<String>> get_g_V_valueXnameX_aggregate() {
-            return (Traversal) g.V().value("name").aggregate().submit(g.compute());
+        public Traversal<Vertex, List<String>> get_g_V_name_aggregate() {
+            return (Traversal) g.V().values("name").aggregate().submit(g.compute());
         }
 
         @Override

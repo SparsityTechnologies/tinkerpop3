@@ -323,7 +323,7 @@ public interface GraphStrategy {
      * {@link com.tinkerpop.gremlin.structure.Vertex.Iterators#vertexIterator} signature
      * and returns an enhanced strategy {@link java.util.function.Supplier} with the same signature
      */
-    public default UnaryOperator<TriFunction<Direction, Integer, String[], Iterator<Vertex>>> getVertexIteratorsVerticesStrategy(final Strategy.Context<StrategyWrappedVertex> ctx) {
+    public default UnaryOperator<BiFunction<Direction, String[], Iterator<Vertex>>> getVertexIteratorsVerticesStrategy(final Strategy.Context<StrategyWrappedVertex> ctx) {
         return UnaryOperator.identity();
     }
 
@@ -347,7 +347,7 @@ public interface GraphStrategy {
      * {@link com.tinkerpop.gremlin.structure.Vertex.Iterators#vertexIterator} signature
      * and returns an enhanced strategy {@link java.util.function.Supplier} with the same signature
      */
-    public default UnaryOperator<TriFunction<Direction, Integer, String[], Iterator<Edge>>> getVertexIteratorsEdgesStrategy(final Strategy.Context<StrategyWrappedVertex> ctx) {
+    public default UnaryOperator<BiFunction<Direction, String[], Iterator<Edge>>> getVertexIteratorsEdgesStrategy(final Strategy.Context<StrategyWrappedVertex> ctx) {
         return UnaryOperator.identity();
     }
 
@@ -678,6 +678,18 @@ public interface GraphStrategy {
      * and returns an enhanced strategy {@link java.util.function.Supplier} with the same signature
      */
     public default <V> UnaryOperator<Supplier<Vertex>> getVertexPropertyGetElementStrategy(final Strategy.Context<StrategyWrappedVertexProperty<V>> ctx) {
+        return UnaryOperator.identity();
+    }
+
+    public default UnaryOperator<Supplier<GraphTraversal<Vertex,Vertex>>> getGraphVStrategy(final Strategy.Context<StrategyWrappedGraph> ctx) {
+        return UnaryOperator.identity();
+    }
+
+    public default UnaryOperator<Supplier<GraphTraversal<Edge,Edge>>> getGraphEStrategy(final Strategy.Context<StrategyWrappedGraph> ctx) {
+        return UnaryOperator.identity();
+    }
+
+    public default UnaryOperator<Supplier<GraphTraversal>> getGraphOfStrategy(final Strategy.Context<StrategyWrappedGraph> ctx) {
         return UnaryOperator.identity();
     }
 

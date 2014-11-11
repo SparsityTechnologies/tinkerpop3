@@ -9,7 +9,9 @@ import com.tinkerpop.gremlin.process.computer.traversal.TraversalScript;
 import com.tinkerpop.gremlin.process.computer.traversal.TraversalVertexProgram;
 import com.tinkerpop.gremlin.process.computer.traversal.step.map.ComputerResultStep;
 import com.tinkerpop.gremlin.process.graph.GraphTraversal;
+import com.tinkerpop.gremlin.process.TraversalEngine;
 import com.tinkerpop.gremlin.structure.Graph;
+import org.apache.commons.configuration.Configuration;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
@@ -40,14 +42,18 @@ public class GroovyTraversalScript<S, E> implements TraversalScript<S, E> {
 
     @Override
     public GroovyTraversalScript<S, E> over(final Graph graph) {
-        this.openGraphScript = String.format("g = GraphFactory.open(['gremlin.graph':'%s'])\n", graph.getClass().getName());
+        final Configuration configuration = graph.configuration();
+        final StringBuilder configurationMap = new StringBuilder("g = GraphFactory.open([");
+        configuration.getKeys().forEachRemaining(key -> configurationMap.append("'").append(key).append("':'").append(configuration.getProperty(key)).append("',"));
+        configurationMap.deleteCharAt(configurationMap.length() - 1).append("])\n");
+        this.openGraphScript = configurationMap.toString();
         return this;
     }
 
     @Override
     public GroovyTraversalScript<S, E> using(final GraphComputer graphComputer) {
         this.graphComputer = graphComputer;
-        this.graphComputerScript = "traversal.prepareForGraphComputer()\ntraversal.strategies().apply()\n";
+        this.graphComputerScript = "traversal.applyStrategies(" + TraversalEngine.class.getCanonicalName() + "." + TraversalEngine.COMPUTER + ")\n";
         return this;
     }
 

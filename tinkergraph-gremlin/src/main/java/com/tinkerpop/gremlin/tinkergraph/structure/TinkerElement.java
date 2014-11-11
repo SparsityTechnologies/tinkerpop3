@@ -4,7 +4,6 @@ import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Property;
 import com.tinkerpop.gremlin.structure.util.ElementHelper;
-import com.tinkerpop.gremlin.structure.util.PropertyFilterIterator;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -22,6 +21,7 @@ public abstract class TinkerElement implements Element, Element.Iterators {
     protected final Object id;
     protected final String label;
     protected final TinkerGraph graph;
+    protected boolean removed = false;
 
     protected TinkerElement(final Object id, final String label, final TinkerGraph graph) {
         this.graph = graph;
@@ -65,6 +65,7 @@ public abstract class TinkerElement implements Element, Element.Iterators {
 
     @Override
     public <V> Property<V> property(final String key) {
+        if (removed) throw Element.Exceptions.elementAlreadyRemoved(this.getClass(), this.id);
         if (TinkerHelper.inComputerMode(this.graph)) {
             final List<Property> list = this.graph.graphView.getProperty(this, key);
             return list.size() == 0 ? Property.<V>empty() : list.get(0);
@@ -73,6 +74,7 @@ public abstract class TinkerElement implements Element, Element.Iterators {
         }
     }
 
+    @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
     @Override
     public boolean equals(final Object object) {
         return ElementHelper.areEqual(this, object);
@@ -82,15 +84,27 @@ public abstract class TinkerElement implements Element, Element.Iterators {
 
     @Override
     public <V> Iterator<? extends Property<V>> hiddenPropertyIterator(final String... propertyKeys) {
-        return TinkerHelper.inComputerMode(graph) ?
-                new PropertyFilterIterator<>(graph.graphView.getProperties(TinkerElement.this).iterator(), true, propertyKeys) :
-                new PropertyFilterIterator<>(properties.values().stream().flatMap(list -> list.stream()).collect(Collectors.toList()).iterator(), true, propertyKeys);
+        return (Iterator) (TinkerHelper.inComputerMode(this.graph) ?
+                this.graph.graphView.getProperties(TinkerElement.this).stream().filter(Property::isHidden).filter(p -> keyExists(p.key(), propertyKeys)).iterator() :
+                this.properties.values().stream().flatMap(list -> list.stream()).filter(Property::isHidden).filter(p -> keyExists(p.key(), propertyKeys)).collect(Collectors.toList()).iterator());
     }
 
     @Override
     public <V> Iterator<? extends Property<V>> propertyIterator(final String... propertyKeys) {
-        return TinkerHelper.inComputerMode(graph) ?
-                new PropertyFilterIterator<>(graph.graphView.getProperties(TinkerElement.this).iterator(), false, propertyKeys) :
-                new PropertyFilterIterator<>(properties.values().stream().flatMap(list -> list.stream()).collect(Collectors.toList()).iterator(), false, propertyKeys);
+        return (Iterator) (TinkerHelper.inComputerMode(this.graph) ?
+                this.graph.graphView.getProperties(TinkerElement.this).stream().filter(p -> !p.isHidden()).filter(p -> keyExists(p.key(), propertyKeys)).iterator() :
+                this.properties.values().stream().flatMap(list -> list.stream()).filter(p -> !p.isHidden()).filter(p -> keyExists(p.key(), propertyKeys)).collect(Collectors.toList()).iterator());
+    }
+
+    private final boolean keyExists(final String key, final String... providedKeys) {
+        if (0 == providedKeys.length) return true;
+        if (1 == providedKeys.length) return key.equals(providedKeys[0]);
+        else {
+            for (final String temp : providedKeys) {
+                if (temp.equals(key))
+                    return true;
+            }
+            return false;
+        }
     }
 }

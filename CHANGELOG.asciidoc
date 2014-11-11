@@ -6,9 +6,77 @@ TinkerPop 3.0.0 (A Gremlin Rāga in 7/16 Time)
 
 image::http://www.tinkerpop.com/docs/current/images/gremlin-hindu.png[width=225]
 
-TinkerPop 3.0.0.M5 (NOT OFFICIALLY RELEASED YET)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TinkerPop 3.0.0.M6 (Release Date: NOT OFFICIALLY RELEASED YET)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+
+TinkerPop 3.0.0.M5 (Release Date: November 7, 2014)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Removed `PropertyFilterIterator` as using Java8 streams was just as efficient for the use case.
+* Renamed `KryoWritable` to `GremlinWritable` as it is not necessarily Kryo that is the serialization mechanism.
+* Fixed an input split bug in Giraph that was making it so that splits were not always at vertex boundaries.
+* Fixed a combiner bug in `GirapGraphComputer`. Combiners were always calling `MapReduce.reduce()`, not `MapReduce.combine()`.
+* Greatly simplified `SubgraphStrategy` by removing requirements for `Traversal` introspection.
+* `StrategyWrappedGraph` mimics vendor use of `GraphStep` and `GraphTraversal` and no longer requires dynamic strategy application.
+* `TraversalStrategies` make use of a dependency tree sorting algorithm to ensure proper sorts prior to application.
+* `TraversalStrategies` are now immutable and are bound to the `Traversal` class.
+* Fixed bug in Gephi Plugin that prevented it from communicating with the Gephi Streaming Server.
+* Renamed `MessageType.XXX.to()` to `MessageType.XXX.of()` so it makes sense in both the sending and receiving context.
+* Improved messaging with respect to tests that are ignored due to features to make it clear that those tests are not in error.
+* Relaxed exception consistency checks in the test suite to only check that a thrown exception from an implementation extends the expected exception class (but no longer validates that it is the exact class or that the message text).
+* `VertexProgram` now has `workerIterationStart()` and `workerIterationEnd()` to allow developers to control vertex split static data structures.
+* `TraversalVertexProgram` startup time greatly reduced due to being smart about `loadState()` behavior.
+* Gremlin Server sessions now allow serialization of results that were part of an open transaction.
+* Refactor `OpProcessors` implementations in Gremlin Server for better reusability.
+* `Vertex.iterators()` no longer have a `branchFactor`. This is now at the query language level with `localLimit()`.
+* Added `limit(long)` and `localLimit(int,int)` which simply call the range equivalents with 0 as the low.
+* Added `LocalRangeStep` which supports ranging the edges and properties of an element -- `localRange(int,int)`.
+* `GraphTraversal.value(String)` no longer exists. Instead, use `GraphTraversal.values(String)`.
+* `HiddenXXXStep` and `ValueXXXStep` no longer exist. `PropertyXXXStep` takes a `PropertyType` to denote value and hidden access.
+* Added `PropertyType` to the structure-package which provide markers for denoting property types (vs. property classes).
+* Renamed `setWorkingDirectory` to `workingDirectory` in the `KryoReader` builder.
+* `Path.get(String)` returns the object if only one object is referenced by label, else it returns a `List` of referenced objects.
+* Added overload to `GremlinKryo` to allow a serializer to be configured as a `Function<Kryo,Serializer>` to allow better flexibility in serializer creation.
+* Added method to `GraphProvider` to allow implementers to provide a mechanism to convert GraphSON serialized identifiers back to custom identifiers as needed.
+* Added methods to `GraphProvider` so that implementers could specify a custom built `GremlinKryo` class and/or `SimpleModule` class in case their implementation had custom classes to be serialized.
+* Added `Traversal.forEachRemaining(class,consumer)` for those traversals whose end type is different from declared due to strategy rewriting.
+* Removed `Traversal.forEach()` as traversal implements `Iterator` and users should use `forEachRemaining()`.
+* `RangeStep` now has an inclusive low and an exclusive high -- a change from Gremlin2.
+* `DriverGremlinPlugin` returns raw results with driver results available via the `result` variable.
+* Removed test enforcement of `private` constructor for a `Graph` instance.
+* `RemoteAcceptor` now supports `@` prefixed lines that will grab the script string from the Gremlin Console shell.
+* Modified the signature of `Property.element()` to simply return `Element`
+* Added `Reducing` marker and `ReducingStrategy` which supports reduction-functions as a final step in Gremlin OLAP (e.g. `fold()`).
+* Once strategies are `complete()`, no more steps can be added to a `Traversal`.
+* Renamed `Traversal.strategies()` to `Traversal.getStrategies()` as it is not a "query language"-method.
+* Added test to enforce that a `label` on a `VertexProperty` is always set to the key of the owning property.
+* Fixed bug with multi-property removal in `Neo4jGraph`.
+* Bumped to Neo4j 2.1.5.
+* Used standard `UUIDSerializer` from the `kryo-serializers` library for serialization of `UUID` objects.
+* Changed GraphSON serialization to only use `iterators()` - there were still remnants of `Traversal` usage from previous refactoring.
+* Added overload for `detach` method to allow for the `Element` to be detached as a "reference" only (i.e. without properties).
+* Renamed `Item` in `gremlin-driver` to `Result`.
+* Renamed `strategy` to `getStrategy` in `StrategyWrappedGraph`.
+* Renamed `baseGraph` to `getBaseGraph` in `Neo4jGraph`.
+* `Neo4jGraph` now returns an empty property `Vertex.property(k)` when the key is non-existent (a problem only visible when meta/multi property configuration was turned off).
+* `Traversal.Strategies.apply()` now takes a `TraversalEngine`. Greatly simplifies strategy application for `STANDARD` or `COMPUTER`.
+* Renamed `IdentityReductionStrategy` to `IdentityRemovalStrategy` for reasons of clarity.
+* Added `ComparingRemovalStrategy` that removes `Comparing`-marked steps unless they are the end step of the traversal.
+* `OrderStep` now works in OLAP, but only makes sense as a traversal end step.
+* `MapReduce` API extended to include `getMapKeySort()` and `getReduceKeySort()` to sort outputs accordingly.
+* Renamed `TraversalResultMapReduce` to `TraverserMapReduce`. Shorter and makes more sense.
+* Improved build automation to package javadocs and asciidoc documentation in the distribution files.
+* Improved build automation with a script to automatically bump release versions in the various files that needed it such as the `pom.xml` files.
+* The identifier on `VertexProperty` is now read properly to those graphs that can support identifier assignment.
+* `GraphSONReader.readGraph()` now properly reads vertex properties.
+* Removed `Neo4jGraph.getCypher()` as users should use `Neo4jGraph.cypher()` and get back TinkerPop3 graph objects.
+* `GiraphGraph.variables().getConfiguration()` is now replaced by `GiraphGraph.configuration()`.
+* Added `Graph.configuration()` which returns the `Configuration` object of `Graph.open()`.
+* Removed `TraverserTracker` as now there is only a `TraverserSet` for all halted traversers. A nice simplification of `TraversalVertexProgram`.
+* Renamed `Traverser.isDone()` to `Traverser.isHalted()` and `DONE` to `HALT`. Consistent with automata terminology.
+* Removed `PathTraverserExecutor` and `SimpleTraverserExecutor` as a single `TraverserExecutor` correctly executes both types of traversers.
+* `TraversalVertexProgram` does "reflexive message passing" to reduce the total number of iterations required to execute a traversal.
 * `MapReduce` no-argument constructors are private and thus, only for reflection and `loadState()` usage.
 * MapReducers for `TraversalVertexProgram` are now smart about `with()` declared data structures.
 * Updated `Traversal.SideEffects` to use "registered suppliers" and it now works accordingly in both OLTP and OLAP environments.

@@ -4,6 +4,7 @@ import com.tinkerpop.gremlin.process.Path;
 import com.tinkerpop.gremlin.process.Step;
 import com.tinkerpop.gremlin.process.T;
 import com.tinkerpop.gremlin.process.Traversal;
+import com.tinkerpop.gremlin.process.TraversalEngine;
 import com.tinkerpop.gremlin.process.Traverser;
 import com.tinkerpop.gremlin.process.computer.GraphComputer;
 import com.tinkerpop.gremlin.process.graph.marker.SideEffectCapable;
@@ -17,6 +18,7 @@ import com.tinkerpop.gremlin.process.graph.step.filter.ExceptStep;
 import com.tinkerpop.gremlin.process.graph.step.filter.FilterStep;
 import com.tinkerpop.gremlin.process.graph.step.filter.HasStep;
 import com.tinkerpop.gremlin.process.graph.step.filter.IntervalStep;
+import com.tinkerpop.gremlin.process.graph.step.filter.LocalRangeStep;
 import com.tinkerpop.gremlin.process.graph.step.filter.RandomStep;
 import com.tinkerpop.gremlin.process.graph.step.filter.RangeStep;
 import com.tinkerpop.gremlin.process.graph.step.filter.RetainStep;
@@ -28,10 +30,6 @@ import com.tinkerpop.gremlin.process.graph.step.map.EdgeOtherVertexStep;
 import com.tinkerpop.gremlin.process.graph.step.map.EdgeVertexStep;
 import com.tinkerpop.gremlin.process.graph.step.map.FlatMapStep;
 import com.tinkerpop.gremlin.process.graph.step.map.FoldStep;
-import com.tinkerpop.gremlin.process.graph.step.map.HiddenMapStep;
-import com.tinkerpop.gremlin.process.graph.step.map.HiddenValueMapStep;
-import com.tinkerpop.gremlin.process.graph.step.map.HiddenValueStep;
-import com.tinkerpop.gremlin.process.graph.step.map.HiddensStep;
 import com.tinkerpop.gremlin.process.graph.step.map.IdStep;
 import com.tinkerpop.gremlin.process.graph.step.map.KeyStep;
 import com.tinkerpop.gremlin.process.graph.step.map.LabelStep;
@@ -46,9 +44,6 @@ import com.tinkerpop.gremlin.process.graph.step.map.SelectOneStep;
 import com.tinkerpop.gremlin.process.graph.step.map.SelectStep;
 import com.tinkerpop.gremlin.process.graph.step.map.ShuffleStep;
 import com.tinkerpop.gremlin.process.graph.step.map.UnfoldStep;
-import com.tinkerpop.gremlin.process.graph.step.map.ValueMapStep;
-import com.tinkerpop.gremlin.process.graph.step.map.ValueStep;
-import com.tinkerpop.gremlin.process.graph.step.map.ValuesStep;
 import com.tinkerpop.gremlin.process.graph.step.map.VertexStep;
 import com.tinkerpop.gremlin.process.graph.step.map.match.MatchStep;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.AddEdgeStep;
@@ -65,8 +60,6 @@ import com.tinkerpop.gremlin.process.graph.step.sideEffect.StoreStep;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.SubgraphStep;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.TreeStep;
 import com.tinkerpop.gremlin.process.graph.step.util.PathIdentityStep;
-import com.tinkerpop.gremlin.process.graph.strategy.ChooseLinearStrategy;
-import com.tinkerpop.gremlin.process.graph.strategy.UnionLinearStrategy;
 import com.tinkerpop.gremlin.process.graph.util.DefaultGraphTraversal;
 import com.tinkerpop.gremlin.process.marker.CapTraversal;
 import com.tinkerpop.gremlin.process.marker.CountTraversal;
@@ -79,6 +72,7 @@ import com.tinkerpop.gremlin.structure.Element;
 import com.tinkerpop.gremlin.structure.Graph;
 import com.tinkerpop.gremlin.structure.Order;
 import com.tinkerpop.gremlin.structure.Property;
+import com.tinkerpop.gremlin.structure.PropertyType;
 import com.tinkerpop.gremlin.structure.Vertex;
 import com.tinkerpop.gremlin.structure.util.HasContainer;
 
@@ -101,13 +95,6 @@ import java.util.function.Supplier;
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
 public interface GraphTraversal<S, E> extends Traversal<S, E>, CountTraversal<S, E>, CapTraversal<S, E> {
-
-    @Override
-    public default void prepareForGraphComputer() {
-        CountTraversal.super.prepareForGraphComputer();
-        this.strategies().register(ChooseLinearStrategy.instance());
-        this.strategies().register(UnionLinearStrategy.instance());
-    }
 
     @Override
     public default GraphTraversal<S, E> submit(final GraphComputer computer) {
@@ -155,68 +142,36 @@ public interface GraphTraversal<S, E> extends Traversal<S, E>, CountTraversal<S,
         return this.addStep(new IdentityStep<>(this));
     }
 
-    public default GraphTraversal<S, Vertex> to(final Direction direction, final int branchFactor, final String... edgeLabels) {
-        return this.addStep(new VertexStep<>(this, Vertex.class, direction, branchFactor, edgeLabels));
-    }
-
     public default GraphTraversal<S, Vertex> to(final Direction direction, final String... edgeLabels) {
-        return this.to(direction, Integer.MAX_VALUE, edgeLabels);
-    }
-
-    public default GraphTraversal<S, Vertex> out(final int branchFactor, final String... edgeLabels) {
-        return this.to(Direction.OUT, branchFactor, edgeLabels);
+        return this.addStep(new VertexStep<>(this, Vertex.class, direction, edgeLabels));
     }
 
     public default GraphTraversal<S, Vertex> out(final String... edgeLabels) {
-        return this.to(Direction.OUT, Integer.MAX_VALUE, edgeLabels);
-    }
-
-    public default GraphTraversal<S, Vertex> in(final int branchFactor, final String... edgeLabels) {
-        return this.to(Direction.IN, branchFactor, edgeLabels);
+        return this.to(Direction.OUT, edgeLabels);
     }
 
     public default GraphTraversal<S, Vertex> in(final String... edgeLabels) {
-        return this.to(Direction.IN, Integer.MAX_VALUE, edgeLabels);
-    }
-
-    public default GraphTraversal<S, Vertex> both(final int branchFactor, final String... edgeLabels) {
-        return this.to(Direction.BOTH, branchFactor, edgeLabels);
+        return this.to(Direction.IN, edgeLabels);
     }
 
     public default GraphTraversal<S, Vertex> both(final String... edgeLabels) {
-        return this.to(Direction.BOTH, Integer.MAX_VALUE, edgeLabels);
-    }
-
-    public default GraphTraversal<S, Edge> toE(final Direction direction, final int branchFactor, final String... edgeLabels) {
-        return this.addStep(new VertexStep<>(this, Edge.class, direction, branchFactor, edgeLabels));
+        return this.to(Direction.BOTH, edgeLabels);
     }
 
     public default GraphTraversal<S, Edge> toE(final Direction direction, final String... edgeLabels) {
-        return this.toE(direction, Integer.MAX_VALUE, edgeLabels);
-    }
-
-    public default GraphTraversal<S, Edge> outE(final int branchFactor, final String... edgeLabels) {
-        return this.toE(Direction.OUT, branchFactor, edgeLabels);
+        return this.addStep(new VertexStep<>(this, Edge.class, direction, edgeLabels));
     }
 
     public default GraphTraversal<S, Edge> outE(final String... edgeLabels) {
-        return this.toE(Direction.OUT, Integer.MAX_VALUE, edgeLabels);
-    }
-
-    public default GraphTraversal<S, Edge> inE(final int branchFactor, final String... edgeLabels) {
-        return this.toE(Direction.IN, branchFactor, edgeLabels);
+        return this.toE(Direction.OUT, edgeLabels);
     }
 
     public default GraphTraversal<S, Edge> inE(final String... edgeLabels) {
-        return this.toE(Direction.IN, Integer.MAX_VALUE, edgeLabels);
-    }
-
-    public default GraphTraversal<S, Edge> bothE(final int branchFactor, final String... edgeLabels) {
-        return this.toE(Direction.BOTH, branchFactor, edgeLabels);
+        return this.toE(Direction.IN, edgeLabels);
     }
 
     public default GraphTraversal<S, Edge> bothE(final String... edgeLabels) {
-        return this.toE(Direction.BOTH, Integer.MAX_VALUE, edgeLabels);
+        return this.toE(Direction.BOTH, edgeLabels);
     }
 
     public default GraphTraversal<S, Vertex> toV(final Direction direction) {
@@ -243,16 +198,24 @@ public interface GraphTraversal<S, E> extends Traversal<S, E>, CountTraversal<S,
         return this.order((a, b) -> a.compareTo(b));
     }
 
-    public default GraphTraversal<S, E> order(final Comparator<Traverser<E>> comparator) {
-        return this.addStep(new OrderStep<>(this, comparator));
+    public default GraphTraversal<S, E> order(final Comparator<Traverser<E>>... comparators) {
+        return this.addStep(new OrderStep<>(this, comparators));
     }
 
-    public default <E2 extends Element> GraphTraversal<S, E2> orderBy(final String key) {
+    public default GraphTraversal<S, E> orderBy(final String key) {
         return this.orderBy(key, Order.incr);
     }
 
-    public default <E2 extends Element> GraphTraversal<S, E2> orderBy(final String key, final Comparator comparator) {
-        return this.addStep(new OrderByStep<>(this, key, comparator));
+    public default GraphTraversal<S, E> orderBy(final T accessor) {
+        return this.orderBy(accessor, Order.incr);
+    }
+
+    public default <C> GraphTraversal<S, E> orderBy(final String key, final Comparator<C>... comparators) {
+        return this.addStep(new OrderByStep(this, key, comparators));
+    }
+
+    public default <C> GraphTraversal<S, E> orderBy(final T accessor, final Comparator<C>... comparators) {
+        return this.addStep(new OrderByStep(this, accessor, comparators));
     }
 
     public default GraphTraversal<S, E> shuffle() {
@@ -260,47 +223,35 @@ public interface GraphTraversal<S, E> extends Traversal<S, E>, CountTraversal<S,
     }
 
     public default <E2> GraphTraversal<S, ? extends Property<E2>> properties(final String... propertyKeys) {
-        return this.addStep(new PropertiesStep<>(this, propertyKeys));
+        return this.addStep(new PropertiesStep<>(this, PropertyType.PROPERTY, propertyKeys));
     }
 
-    public default <E2> GraphTraversal<S, Map<String, E2>> propertyMap(final String... propertyKeys) {
-        return this.addStep(new PropertyMapStep<>(this, propertyKeys));
+    public default <E2> GraphTraversal<S, E2> values(final String... propertyKeys) {
+        return this.addStep(new PropertiesStep<>(this, PropertyType.VALUE, propertyKeys));
     }
 
     public default <E2> GraphTraversal<S, ? extends Property<E2>> hiddens(final String... propertyKeys) {
-        return this.addStep(new HiddensStep<>(this, propertyKeys));
+        return this.addStep(new PropertiesStep<>(this, PropertyType.HIDDEN_PROPERTY, propertyKeys));
+    }
+
+    public default <E2> GraphTraversal<S, E2> hiddenValues(final String... propertyKeys) {
+        return this.addStep(new PropertiesStep<>(this, PropertyType.HIDDEN_VALUE, propertyKeys));
+    }
+
+    public default <E2> GraphTraversal<S, Map<String, E2>> propertyMap(final String... propertyKeys) {
+        return this.addStep(new PropertyMapStep<>(this, PropertyType.PROPERTY, propertyKeys));
+    }
+
+    public default <E2> GraphTraversal<S, Map<String, E2>> valueMap(final String... propertyKeys) {
+        return this.addStep(new PropertyMapStep<>(this, PropertyType.VALUE, propertyKeys));
     }
 
     public default <E2> GraphTraversal<S, Map<String, E2>> hiddenMap(final String... propertyKeys) {
-        return this.addStep(new HiddenMapStep<>(this, propertyKeys));
+        return this.addStep(new PropertyMapStep<>(this, PropertyType.HIDDEN_PROPERTY, propertyKeys));
     }
 
     public default <E2> GraphTraversal<S, Map<String, E2>> hiddenValueMap(final String... propertyKeys) {
-        return this.addStep(new HiddenValueMapStep<>(this, propertyKeys));
-    }
-
-    public default <E2> GraphTraversal<S, E2> hiddenValue(final String propertyKey) {
-        return this.addStep(new HiddenValueStep<>(this, propertyKey));
-    }
-
-    public default <E2> GraphTraversal<S, E2> hiddenValue(final String propertyKey, final E2 defaultValue) {
-        return this.addStep(new HiddenValueStep<>(this, propertyKey, defaultValue));
-    }
-
-    public default <E2> GraphTraversal<S, E2> hiddenValue(final String propertyKey, final Supplier<E2> defaultSupplier) {
-        return this.addStep(new HiddenValueStep<>(this, propertyKey, defaultSupplier));
-    }
-
-    public default <E2> GraphTraversal<S, E2> value(final String propertyKey) {
-        return this.addStep(new ValueStep<>(this, propertyKey));
-    }
-
-    public default <E2> GraphTraversal<S, E2> value(final String propertyKey, final E2 defaultValue) {
-        return this.addStep(new ValueStep<>(this, propertyKey, defaultValue));
-    }
-
-    public default <E2> GraphTraversal<S, E2> value(final String propertyKey, final Supplier<E2> defaultSupplier) {
-        return this.addStep(new ValueStep<>(this, propertyKey, defaultSupplier));
+        return this.addStep(new PropertyMapStep<>(this, PropertyType.HIDDEN_VALUE, propertyKeys));
     }
 
     public default GraphTraversal<S, String> key() {
@@ -309,14 +260,6 @@ public interface GraphTraversal<S, E> extends Traversal<S, E>, CountTraversal<S,
 
     public default <E2> GraphTraversal<S, E2> value() {
         return this.addStep(new PropertyValueStep<>(this));
-    }
-
-    public default <E2> GraphTraversal<S, Map<String, E2>> valueMap(final String... propertyKeys) {
-        return this.addStep(new ValueMapStep<>(this, propertyKeys));
-    }
-
-    public default <E2> GraphTraversal<S, E2> values(final String... propertyKeys) {
-        return this.addStep(new ValuesStep<>(this, propertyKeys));
     }
 
     public default GraphTraversal<S, Path> path(final Function... pathFunctions) {
@@ -356,7 +299,7 @@ public interface GraphTraversal<S, E> extends Traversal<S, E>, CountTraversal<S,
     }
 
     public default <E2> GraphTraversal<S, E2> fold(final E2 seed, final BiFunction<E2, Traverser<E>, E2> foldFunction) {
-        return this.addStep(new FoldStep<>(this, seed, foldFunction));
+        return this.addStep(new FoldStep<>(this, () -> (E2) seed, foldFunction)); // TODO: User should provide supplier
     }
 
     ///////////////////// FILTER STEPS /////////////////////
@@ -445,8 +388,20 @@ public interface GraphTraversal<S, E> extends Traversal<S, E>, CountTraversal<S,
         return this.addStep(new RandomStep<>(this, probability));
     }
 
-    public default GraphTraversal<S, E> range(final int low, final int high) {
+    public default GraphTraversal<S, E> range(final long low, final long high) {
         return this.addStep(new RangeStep<>(this, low, high));
+    }
+
+    public default GraphTraversal<S, E> limit(final long limit) {
+        return this.range(0, limit);
+    }
+
+    public default <E2 extends Element> GraphTraversal<S, E2> localRange(final int low, final int high) {
+        return this.addStep(new LocalRangeStep<>(this, low, high));
+    }
+
+    public default <E2 extends Element> GraphTraversal<S, E2> localLimit(final int limit) {
+        return this.localRange(0, limit);
     }
 
     public default GraphTraversal<S, E> retain(final String variable) {
@@ -675,8 +630,7 @@ public interface GraphTraversal<S, E> extends Traversal<S, E>, CountTraversal<S,
     public default GraphTraversal<S, E> as(final String label) {
         TraversalHelper.verifyStepLabelIsNotAlreadyAStepLabel(label, this);
         TraversalHelper.verifyStepLabelIsNotASideEffectKey(label, this);
-        final List<Step> steps = this.getSteps();
-        steps.get(steps.size() - 1).setLabel(label);
+        TraversalHelper.getEnd(this).setLabel(label);
         return this;
     }
 
@@ -687,7 +641,7 @@ public interface GraphTraversal<S, E> extends Traversal<S, E>, CountTraversal<S,
     @Override
     public default void remove() {
         try {
-            this.strategies().apply();
+            this.applyStrategies(TraversalEngine.STANDARD);
             final Step<?, E> endStep = TraversalHelper.getEnd(this);
             while (true) {
                 final Object object = endStep.next().get();

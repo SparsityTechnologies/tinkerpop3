@@ -8,23 +8,26 @@ import com.tinkerpop.gremlin.process.computer.GroovyGraphComputerTest;
 import com.tinkerpop.gremlin.process.graph.step.branch.GroovyChooseTest;
 import com.tinkerpop.gremlin.process.graph.step.branch.GroovyJumpTest;
 import com.tinkerpop.gremlin.process.graph.step.branch.GroovyUnionTest;
+import com.tinkerpop.gremlin.process.graph.step.branch.GroovyUntilTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.GroovyCyclicPathTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.GroovyFilterTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.GroovyHasNotTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.GroovyHasTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.GroovyIntervalTest;
+import com.tinkerpop.gremlin.process.graph.step.filter.GroovyLocalRangeTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.GroovyRandomTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.GroovySimplePathTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.GroovyWhereTest;
 import com.tinkerpop.gremlin.process.graph.step.map.GroovyBackTest;
+import com.tinkerpop.gremlin.process.graph.step.map.GroovyFoldTest;
 import com.tinkerpop.gremlin.process.graph.step.map.GroovyHiddenValueMapTest;
 import com.tinkerpop.gremlin.process.graph.step.map.GroovyMapTest;
+import com.tinkerpop.gremlin.process.graph.step.map.GroovyOrderTest;
 import com.tinkerpop.gremlin.process.graph.step.map.GroovyPathTest;
 import com.tinkerpop.gremlin.process.graph.step.map.GroovyPropertiesTest;
 import com.tinkerpop.gremlin.process.graph.step.map.GroovySelectTest;
 import com.tinkerpop.gremlin.process.graph.step.map.GroovyShuffleTest;
 import com.tinkerpop.gremlin.process.graph.step.map.GroovyUnfoldTest;
-import com.tinkerpop.gremlin.process.graph.step.branch.GroovyUntilTest;
 import com.tinkerpop.gremlin.process.graph.step.map.GroovyValueMapTest;
 import com.tinkerpop.gremlin.process.graph.step.map.GroovyVertexTest;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.GroovyAggregateTest;
@@ -66,6 +69,7 @@ public class GroovyProcessComputerSuite extends ProcessComputerSuite {
             GroovyHasNotTest.ComputerTest.class,
             GroovyHasTest.ComputerTest.class,
             GroovyIntervalTest.ComputerTest.class,
+            GroovyLocalRangeTest.ComputerTest.class,
             GroovyRandomTest.ComputerTest.class,
             // TODO: GroovyRangeTest.ComputerTest.class,
             // TODO: GroovyRetainTest.ComputerTest.class,
@@ -74,20 +78,17 @@ public class GroovyProcessComputerSuite extends ProcessComputerSuite {
 
             // map
             GroovyBackTest.ComputerTest.class,
-            // TODO: GroovyChooseTest.ComputerTest.class,
-            // TODO: GroovyFoldTest.ComputerTest.class,
+            GroovyFoldTest.ComputerTest.class,
             GroovyHiddenValueMapTest.ComputerTest.class,
-
             GroovyMapTest.ComputerTest.class,
             // TODO: GroovyMatchTest.ComputerTest.class,
             // TODO: GroovyOrderByTest.ComputerTest.class,
-            // TODO: GroovyOrderTest.ComputerTest.class,
+            GroovyOrderTest.ComputerTest.class,
             GroovyPathTest.ComputerTest.class,
             GroovyPropertiesTest.ComputerTest.class,
             GroovySelectTest.ComputerTest.class,
             GroovyShuffleTest.ComputerTest.class,
             GroovyUnfoldTest.ComputerTest.class,
-
             GroovyValueMapTest.ComputerTest.class,
             GroovyVertexTest.ComputerTest.class,
 
@@ -100,7 +101,9 @@ public class GroovyProcessComputerSuite extends ProcessComputerSuite {
             GroovyInjectTest.ComputerTest.class,
             GroovyProfileTest.ComputerTest.class,
             GroovySideEffectCapTest.ComputerTest.class,
+            // TODO: GroovySideEffectTest.ComputerTest.class,
             GroovyStoreTest.ComputerTest.class,
+            // TODO: GroovySubgraphTest.ComputerTest.class,
             GroovyTreeTest.ComputerTest.class
     };
 

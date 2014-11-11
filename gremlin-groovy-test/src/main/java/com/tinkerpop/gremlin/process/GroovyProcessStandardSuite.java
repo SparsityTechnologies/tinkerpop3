@@ -15,6 +15,7 @@ import com.tinkerpop.gremlin.process.graph.step.filter.GroovyFilterTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.GroovyHasNotTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.GroovyHasTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.GroovyIntervalTest;
+import com.tinkerpop.gremlin.process.graph.step.filter.GroovyLocalRangeTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.GroovyRandomTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.GroovyRangeTest;
 import com.tinkerpop.gremlin.process.graph.step.filter.GroovyRetainTest;
@@ -34,6 +35,7 @@ import com.tinkerpop.gremlin.process.graph.step.map.GroovyShuffleTest;
 import com.tinkerpop.gremlin.process.graph.step.map.GroovyUnfoldTest;
 import com.tinkerpop.gremlin.process.graph.step.map.GroovyValueMapTest;
 import com.tinkerpop.gremlin.process.graph.step.map.GroovyVertexTest;
+import com.tinkerpop.gremlin.process.graph.step.sideEffect.GroovyAddEdgeTest;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.GroovyAggregateTest;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.GroovyCountTest;
 import com.tinkerpop.gremlin.process.graph.step.sideEffect.GroovyGroupByTest;
@@ -73,6 +75,7 @@ public class GroovyProcessStandardSuite extends ProcessStandardSuite {
             GroovyHasNotTest.StandardTest.class,
             GroovyHasTest.StandardTest.class,
             GroovyIntervalTest.StandardTest.class,
+            GroovyLocalRangeTest.StandardTest.class,
             GroovyRandomTest.StandardTest.class,
             GroovyRangeTest.StandardTest.class,
             GroovyRetainTest.StandardTest.class,
@@ -94,6 +97,7 @@ public class GroovyProcessStandardSuite extends ProcessStandardSuite {
             GroovyValueMapTest.StandardTest.class,
             GroovyVertexTest.StandardTest.class,
             // sideEffect
+            GroovyAddEdgeTest.StandardTest.class,
             GroovyAggregateTest.StandardTest.class,
             GroovyCountTest.StandardTest.class,
             GroovyGroupByTest.StandardTest.class,
@@ -105,9 +109,6 @@ public class GroovyProcessStandardSuite extends ProcessStandardSuite {
             GroovyStoreTest.StandardTest.class,
             GroovySubgraphTest.StandardTest.class,
             GroovyTreeTest.StandardTest.class,
-
-            // util
-            // TraversalSideEffectsTest.StandardTest.class,
 
             // compliance
             TraversalCoverageTest.class,

@@ -2,10 +2,8 @@ package com.tinkerpop.gremlin.tinkergraph.structure;
 
 import com.tinkerpop.gremlin.AbstractGremlinTest;
 import com.tinkerpop.gremlin.process.T;
-import com.tinkerpop.gremlin.process.Traverser;
-import com.tinkerpop.gremlin.process.graph.GraphTraversal;
-import com.tinkerpop.gremlin.process.graph.step.sideEffect.ProfileStep;
-import com.tinkerpop.gremlin.process.util.TraversalMetrics;
+import com.tinkerpop.gremlin.process.Traversal;
+import com.tinkerpop.gremlin.process.TraversalEngine;
 import com.tinkerpop.gremlin.structure.Direction;
 import com.tinkerpop.gremlin.structure.Edge;
 import com.tinkerpop.gremlin.structure.Graph;
@@ -21,9 +19,12 @@ import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Set;
-import java.util.function.Predicate;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -53,10 +54,28 @@ public class TinkerGraphTest {
     }
 
     @Test
+    @Ignore
+    public void testPlay() {
+        System.out.println((float)1l / (float)7l);
+        Graph g = TinkerFactory.createModern();
+        Traversal t = g.V().has("name","marko").out().out().values("name");
+        System.out.println(t);
+        t.forEachRemaining(System.out::println);
+        System.out.println(t);
+        System.out.println("!!!!!!!!");
+        t = g.V().has("name","marko").out().out().values("name");
+        System.out.println(t);
+        t.forEachRemaining(System.out::println);
+        System.out.println(t);
+    }
+
+    @Test
     public void testTraversalDSL() throws Exception {
         Graph g = TinkerFactory.createClassic();
-        g.of(TinkerFactory.SocialTraversal.class).people("marko").knows().name().forEach(name -> assertTrue(name.equals("josh") || name.equals("vadas")));
-        g.of(TinkerFactory.SocialTraversal.class).people("marko").created().name().forEach(name -> assertEquals("lop", name));
+        assertEquals(2, g.of(TinkerFactory.SocialTraversal.class).people("marko").knows().name().toList().size());
+        g.of(TinkerFactory.SocialTraversal.class).people("marko").knows().name().forEachRemaining(name -> assertTrue(name.equals("josh") || name.equals("vadas")));
+        assertEquals(1, g.of(TinkerFactory.SocialTraversal.class).people("marko").created().name().toList().size());
+        g.of(TinkerFactory.SocialTraversal.class).people("marko").created().name().forEachRemaining(name -> assertEquals("lop", name));
     }
 
     /**

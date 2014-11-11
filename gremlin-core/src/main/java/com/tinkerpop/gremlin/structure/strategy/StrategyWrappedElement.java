@@ -34,10 +34,4 @@ public abstract class StrategyWrappedElement implements Element, StrategyWrapped
     public boolean equals(final Object object) {
         return ElementHelper.areEqual(this, object);
     }
-
-    protected <S, E> GraphTraversal<S, E> applyStrategy(final GraphTraversal<S, E> traversal) {
-        traversal.strategies().register(new StrategyWrappedTraversalStrategy(this.strategyWrappedGraph));
-        this.strategyWrappedGraph.strategy().getGraphStrategy().ifPresent(s -> s.applyStrategyToTraversal(traversal));
-        return traversal;
-    }
 }

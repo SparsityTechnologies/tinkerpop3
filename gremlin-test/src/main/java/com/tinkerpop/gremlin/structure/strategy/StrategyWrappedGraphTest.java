@@ -98,7 +98,7 @@ public class StrategyWrappedGraphTest  {
             final StrategyWrappedGraph swg = new StrategyWrappedGraph(g);
             final Vertex v1 = swg.addVertex(T.label, "Person");
             final Vertex originalVertex = ((StrategyWrappedVertex) v1).getBaseVertex();
-            swg.strategy().setGraphStrategy(strategy);
+            swg.getStrategy().setGraphStrategy(strategy);
             assertEquals(StringFactory.graphStrategyVertexString(strategy, originalVertex), v1.toString());
         }
 
@@ -110,7 +110,7 @@ public class StrategyWrappedGraphTest  {
             final Vertex v2 = swg.addVertex(T.label, "Person");
             final Edge e1 = v1.addEdge("friend", v2);
             final Edge originalEdge = ((StrategyWrappedEdge) e1).getBaseEdge();
-            swg.strategy().setGraphStrategy(strategy);
+            swg.getStrategy().setGraphStrategy(strategy);
             assertEquals(StringFactory.graphStrategyEdgeString(strategy, originalEdge), e1.toString());
         }
 
@@ -122,7 +122,7 @@ public class StrategyWrappedGraphTest  {
             final VertexProperty age = v1.property("age");
             final Vertex originalVertex = ((StrategyWrappedVertex) v1).getBaseVertex();
             final VertexProperty originalVertexProperty = originalVertex.property("age");
-            swg.strategy().setGraphStrategy(strategy);
+            swg.getStrategy().setGraphStrategy(strategy);
             assertEquals(StringFactory.graphStrategyPropertyString(strategy, originalVertexProperty), age.toString());
         }
 
@@ -136,16 +136,16 @@ public class StrategyWrappedGraphTest  {
             final Property weight = e1.property("weight");
             final Edge originalEdge = ((StrategyWrappedEdge) e1).getBaseEdge();
             final Property originalProperty = originalEdge.property("weight");
-            swg.strategy().setGraphStrategy(strategy);
+            swg.getStrategy().setGraphStrategy(strategy);
             assertEquals(StringFactory.graphStrategyPropertyString(strategy, originalProperty), weight.toString());
         }
 
         @Test
         public void shouldReturnWrappedToString() {
             final StrategyWrappedGraph swg = new StrategyWrappedGraph(g);
-            final GraphStrategy strategy = swg.strategy().getGraphStrategy().orElse(GraphStrategy.DefaultGraphStrategy.INSTANCE);
+            final GraphStrategy strategy = swg.getStrategy().getGraphStrategy().orElse(GraphStrategy.DefaultGraphStrategy.INSTANCE);
             assertNotEquals(g.toString(), swg.toString());
-            swg.strategy().setGraphStrategy(strategy);
+            swg.getStrategy().setGraphStrategy(strategy);
             assertEquals(StringFactory.graphStrategyString(strategy, g), swg.toString());
         }
     }
@@ -158,7 +158,7 @@ public class StrategyWrappedGraphTest  {
 
             // create an ad-hoc strategy that only marks a vertex as "deleted" and removes all edges and properties
             // but doesn't actually blow it away
-            swg.strategy().setGraphStrategy(new GraphStrategy() {
+            swg.getStrategy().setGraphStrategy(new GraphStrategy() {
                 @Override
                 public UnaryOperator<Supplier<Void>> getRemoveVertexStrategy(final Strategy.Context<StrategyWrappedVertex> ctx) {
                     return (t) -> () -> {
@@ -194,7 +194,7 @@ public class StrategyWrappedGraphTest  {
 
             // create an ad-hoc strategy that only marks a vertex as "deleted" and removes all edges and properties
             // but doesn't actually blow it away
-            swg.strategy().setGraphStrategy(new GraphStrategy() {
+            swg.getStrategy().setGraphStrategy(new GraphStrategy() {
                 @Override
                 public UnaryOperator<Supplier<Void>> getRemoveEdgeStrategy(final Strategy.Context<StrategyWrappedEdge> ctx) {
                     return (t) -> () -> {
@@ -225,7 +225,7 @@ public class StrategyWrappedGraphTest  {
             final StrategyWrappedGraph swg = new StrategyWrappedGraph(g);
 
             final AtomicInteger counter = new AtomicInteger(0);
-            swg.strategy().setGraphStrategy(new GraphStrategy() {
+            swg.getStrategy().setGraphStrategy(new GraphStrategy() {
                 @Override
                 public UnaryOperator<Supplier<Void>> getGraphCloseStrategy(final Strategy.Context<StrategyWrappedGraph> ctx) {
                     return (t) -> () -> {
@@ -441,11 +441,10 @@ public class StrategyWrappedGraphTest  {
             tests.add(Pair.with("g.v(1).outE()", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("marko")).outE())));
             tests.add(Pair.with("g.v(4).bothE()", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("josh")).bothE())));
             tests.add(Pair.with("g.v(4).inE()", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("josh")).inE())));
-            tests.add(Pair.with("g.v(11).property(\"weight\").element()", (Graph g, AbstractGremlinTest instance) -> Stream.of(g.e(instance.convertToEdgeId("josh", "created", "lop")).property("weight").element())));
-            tests.add(Pair.with("g.v(1).iterators().edge(Direction.BOTH, 1)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("marko")).iterators().edgeIterator(Direction.BOTH, 1))));
-            tests.add(Pair.with("g.v(4).iterators().edge(Direction.BOTH, Integer.MAX_VALUE)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("josh")).iterators().edgeIterator(Direction.BOTH, Integer.MAX_VALUE))));
-            tests.add(Pair.with("g.v(1).iterators().edge(Direction.BOTH, Integer.MAX_VALUE)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("marko")).iterators().edgeIterator(Direction.OUT, Integer.MAX_VALUE))));
-            tests.add(Pair.with("g.v(4).iterators().edge(Direction.BOTH, Integer.MAX_VALUE)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("josh")).iterators().edgeIterator(Direction.IN, Integer.MAX_VALUE))));
+            tests.add(Pair.with("g.v(11).property(\"weight\").element()", (Graph g, AbstractGremlinTest instance) -> Stream.of((Edge) g.e(instance.convertToEdgeId("josh", "created", "lop")).property("weight").element())));
+            tests.add(Pair.with("g.v(4).iterators().edge(Direction.BOTH)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("josh")).iterators().edgeIterator(Direction.BOTH))));
+            tests.add(Pair.with("g.v(1).iterators().edge(Direction.OUT)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("marko")).iterators().edgeIterator(Direction.OUT))));
+            tests.add(Pair.with("g.v(4).iterators().edge(Direction.IN)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("josh")).iterators().edgeIterator(Direction.IN))));
 
             return tests.stream().map(d -> {
                 final Object[] o = new Object[2];
@@ -488,11 +487,10 @@ public class StrategyWrappedGraphTest  {
             tests.add(Pair.with("g.v(4).bothE().bothV()", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("josh")).bothE().bothV())));
             tests.add(Pair.with("g.v(4).inE().outV()", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("josh")).inE().outV())));
             tests.add(Pair.with("g.v(1).out()", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("marko")).out())));
-            tests.add(Pair.with("g.v(1).iterators().vertices(Direction.BOTH, 1)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("marko")).iterators().vertexIterator(Direction.BOTH, 1))));
-            tests.add(Pair.with("g.v(4).iterators().vertices(Direction.BOTH, Integer.MAX_VALUE)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("josh")).iterators().vertexIterator(Direction.BOTH, Integer.MAX_VALUE))));
-            tests.add(Pair.with("g.v(1).iterators().vertices(Direction.BOTH, Integer.MAX_VALUE)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("marko")).iterators().vertexIterator(Direction.OUT, Integer.MAX_VALUE))));
-            tests.add(Pair.with("g.v(4).iterators().vertices(Direction.BOTH, Integer.MAX_VALUE)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("josh")).iterators().vertexIterator(Direction.IN, Integer.MAX_VALUE))));
-            tests.add(Pair.with("g.v(4).iterators().vertices(Direction.BOTH, Integer.MAX_VALUE, \"created\")", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("josh")).iterators().vertexIterator(Direction.BOTH, Integer.MAX_VALUE, "created"))));
+            tests.add(Pair.with("g.v(4).iterators().vertices(Direction.BOTH)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("josh")).iterators().vertexIterator(Direction.BOTH))));
+            tests.add(Pair.with("g.v(1).iterators().vertices(Direction.OUT)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("marko")).iterators().vertexIterator(Direction.OUT))));
+            tests.add(Pair.with("g.v(4).iterators().vertices(Direction.IN)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("josh")).iterators().vertexIterator(Direction.IN))));
+            tests.add(Pair.with("g.v(4).iterators().vertices(Direction.BOTH, \"created\")", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.v(instance.convertToVertexId("josh")).iterators().vertexIterator(Direction.BOTH, "created"))));
             tests.add(Pair.with("g.e(11).iterators().vertices(Direction.IN)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.e(instance.convertToEdgeId("josh", "created", "lop")).iterators().vertexIterator(Direction.IN))));
             tests.add(Pair.with("g.e(11).iterators().vertices(Direction.OUT)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.e(instance.convertToEdgeId("josh", "created", "lop")).iterators().vertexIterator(Direction.OUT))));
             tests.add(Pair.with("g.e(11).iterators().vertices(Direction.BOTH)", (Graph g, AbstractGremlinTest instance) -> StreamFactory.stream(g.e(instance.convertToEdgeId("josh", "created", "lop")).iterators().vertexIterator(Direction.BOTH))));

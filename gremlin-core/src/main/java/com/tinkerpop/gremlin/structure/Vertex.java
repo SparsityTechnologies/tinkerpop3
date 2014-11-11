@@ -10,14 +10,14 @@ import java.util.Optional;
  * A {@link Vertex} maintains pointers to both a set of incoming and outgoing {@link Edge} objects. The outgoing edges
  * are those edges for  which the {@link Vertex} is the tail. The incoming edges are those edges for which the
  * {@link Vertex} is the head.
- * <p>
+ * <p/>
  * Diagrammatically:
  * <pre>
  * ---inEdges---> vertex ---outEdges--->.
  * </pre>
  *
  * @author Marko A. Rodriguez (http://markorodriguez.com)
- * @author Joshua Shinavier (http://fortytwo.net)
+ * @author Stephen Mallette (http://stephen.genoprime.com)
  */
 public interface Vertex extends Element, VertexTraversal {
 
@@ -39,6 +39,7 @@ public interface Vertex extends Element, VertexTraversal {
      */
     public Edge addEdge(final String label, final Vertex inVertex, final Object... keyValues);
 
+    @Override
     public default <V> VertexProperty<V> property(final String key) {
         final Iterator<VertexProperty<V>> iterator = Graph.Key.isHidden(key) ?
                 this.iterators().hiddenPropertyIterator(Graph.Key.unHide(key)) :
@@ -54,6 +55,7 @@ public interface Vertex extends Element, VertexTraversal {
         }
     }
 
+    @Override
     public <V> VertexProperty<V> property(final String key, final V value);
 
     public default <V> VertexProperty<V> property(final String key, final V value, final Object... keyValues) {
@@ -75,27 +77,48 @@ public interface Vertex extends Element, VertexTraversal {
         return this.property(key, value, keyValues);
     }
 
+    /**
+     * Gets the {@link Vertex.Iterators} set.
+     * <p/>
+     * {@inheritDoc}
+     */
+    @Override
     public Vertex.Iterators iterators();
 
+    /**
+     * An interface that provides access to iterators over {@link VertexProperty} objects, {@link Edge} objects
+     * and adjacent vertices, associated with the {@code Vertex}, without constructing a
+     * {@link com.tinkerpop.gremlin.process.Traversal} object.
+     */
     public interface Iterators extends Element.Iterators {
         /**
-         * @param direction    The incident direction of the edges to retrieve off this vertex
-         * @param branchFactor The max number of edges to retrieve
-         * @param labels       The labels of the edges to retrieve
+         * Gets an {@link Iterator} of incident edges.
+         *
+         * @param direction  The incident direction of the edges to retrieve off this vertex
+         * @param edgeLabels The labels of the edges to retrieve
          * @return An iterator of edges meeting the provided specification
          */
-        public Iterator<Edge> edgeIterator(final Direction direction, final int branchFactor, final String... labels);
+        public Iterator<Edge> edgeIterator(final Direction direction, final String... edgeLabels);
 
         /**
-         * @param direction    The adjacency direction of the vertices to retrieve off this vertex
-         * @param branchFactor The max number of vertices to retrieve
-         * @param labels       The labels of the edges associated with the vertices to retrieve
+         * Gets an {@link Iterator} of adjacent vertices.
+         *
+         * @param direction  The adjacency direction of the vertices to retrieve off this vertex
+         * @param edgeLabels The labels of the edges associated with the vertices to retrieve
          * @return An iterator of vertices meeting the provided specification
          */
-        public Iterator<Vertex> vertexIterator(final Direction direction, final int branchFactor, final String... labels);
+        public Iterator<Vertex> vertexIterator(final Direction direction, final String... edgeLabels);
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public <V> Iterator<VertexProperty<V>> propertyIterator(final String... propertyKeys);
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
         public <V> Iterator<VertexProperty<V>> hiddenPropertyIterator(final String... propertyKeys);
     }
 

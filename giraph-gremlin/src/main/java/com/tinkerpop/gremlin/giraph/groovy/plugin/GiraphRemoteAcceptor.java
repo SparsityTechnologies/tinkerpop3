@@ -23,7 +23,6 @@ import java.util.List;
  */
 public class GiraphRemoteAcceptor implements RemoteAcceptor {
 
-    private static final String RESULT = "result";
     private static final String USE_SUGAR = "useSugar";
     private static final String SPACE = " ";
 
@@ -73,7 +72,7 @@ public class GiraphRemoteAcceptor implements RemoteAcceptor {
             if (args.get(i).equals(USE_SUGAR))
                 this.useSugarPlugin = Boolean.valueOf(args.get(i + 1));
             else {
-                this.giraphGraph.variables().getConfiguration().setProperty(args.get(i), args.get(i + 1));
+                this.giraphGraph.configuration().setProperty(args.get(i), args.get(i + 1));
             }
         }
         return this.giraphGraph;
@@ -82,7 +81,7 @@ public class GiraphRemoteAcceptor implements RemoteAcceptor {
     @Override
     public Object submit(final List<String> args) {
         try {
-            final GroovyTraversalScript<?, ?> traversal = GroovyTraversalScript.of(String.join(SPACE, args)).over(this.giraphGraph).using(this.giraphGraph.compute());
+            final GroovyTraversalScript<?, ?> traversal = GroovyTraversalScript.of(RemoteAcceptor.getScript(String.join(SPACE, args), this.shell)).over(this.giraphGraph).using(this.giraphGraph.compute());
             if (this.useSugarPlugin)
                 traversal.withSugar();
             final TraversalVertexProgram vertexProgram = traversal.program();

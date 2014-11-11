@@ -49,14 +49,14 @@ gremlin> g.V()
 ==>v[4]
 ==>v[5]
 ==>v[6]
-gremlin> g.V().value('name')
+gremlin> g.V().values('name')
 ==>marko
 ==>vadas
 ==>lop
 ==>josh
 ==>ripple
 ==>peter
-gremlin> g.V().has('name','marko').out('knows').value('name')
+gremlin> g.V().has('name','marko').out('knows').values('name')
 ==>vadas
 ==>josh
 ----
@@ -140,7 +140,7 @@ image:gremlin-server.png[width=400,float=right] Gremlin Server provides a way to
 * Provides a method for Non-JVM languages (e.g. Python, .NET, etc.) to communicate with the TinkerPop stack.
 * Exposes numerous methods for extension and customization to include serialization options, remote commands, etc.
 
-NOTE: Gremlin Server is essentially the replacement for link:http://rexster.tinkerpop.com[Rexster].
+NOTE: Gremlin Server is the replacement for link:http://rexster.tinkerpop.com[Rexster].
 
 By default, communication with Gremlin Server occurs over link:http://en.wikipedia.org/wiki/WebSocket[WebSockets] and exposes a custom subprotocol for interacting with the server.
 
@@ -152,7 +152,7 @@ The most direct way to get started with Gremlin Server is to issue it some remot
 
 [source,text]
 ----
-$bin/gremlin-server.sh conf/gremlin-server-classic.yaml
+$ bin/gremlin-server.sh conf/gremlin-server-classic.yaml
 [INFO] GremlinServer -
          \,,,/
          (o o)
@@ -168,7 +168,7 @@ $bin/gremlin-server.sh conf/gremlin-server-classic.yaml
 [INFO] GremlinServer$WebSocketServerInitializer - Initialized GremlinExecutor and configured ScriptEngines.
 [INFO] GremlinServer$WebSocketServerInitializer - Initialized Gremlin thread pool.  Threads in pool named with pattern gremlin-*
 [INFO] GremlinServer - Gremlin Server configured with worker thread pool of 1 and boss thread pool of 1
-[INFO] GremlinServer - Websocket channel started at port 8182.
+[INFO] GremlinServer - Channel started at port 8182.
 ----
 
 Gremlin Server is configured by the provided link:http://www.yaml.org/[YAML] file `conf/gremlin-server-classic.yaml`.  That file tells Gremlin Server many things such as:
@@ -203,7 +203,7 @@ The console has the notion of a "remote", which represents a place a script will
 
 [source,groovy]
 ----
-gremlin> :remote connect server conf/remote.yaml
+gremlin> :remote connect tinkerpop.server conf/remote.yaml
 ==>connected - localhost/127.0.0.1:8182
 ----
 
@@ -211,42 +211,59 @@ The `:remote` command shown above displays the current status of the remote conn
 
 [source,groovy]
 ----
-gremlin> :> g.V().value('name')
-==>Item{resultItem=marko class=java.lang.String}
-==>Item{resultItem=vadas class=java.lang.String}
-==>Item{resultItem=lop class=java.lang.String}
-==>Item{resultItem=josh class=java.lang.String}
-==>Item{resultItem=ripple class=java.lang.String}
-==>Item{resultItem=peter class=java.lang.String}
-gremlin> :> g.V().has('name','marko').out('created').value('name')
-==>Item{resultItem=lop class=java.lang.String}
+gremlin> :> g.V().values('name')
+==>marko
+==>vadas
+==>lop
+==>josh
+==>ripple
+==>peter
+gremlin> :> g.V().has('name','marko').out('created').values('name')
+==>lop
 gremlin> :> g.E().label().groupCount()
-==>Item{resultItem={created=4, knows=2} class=java.lang.String}
+==>{created=4, knows=2}
+gremlin> result
+==>result{object={created=4, knows=2} class=java.lang.String}
+gremlin> :remote close
+==>removed - gremlin server - [localhost/127.0.0.1:8182]
 ----
 
-The `:>` command, which is a shorthand for `:submit`, sends the script to the server to execute there.  Results are wrapped in an `Item` object which is a just a holder for each individual result.  The `class` shows the data type for the containing value.  Note that the last script sent was supposed to return a `Map`, but its `class` is `java.lang.String`.  By default, the connection is configured to only return text results.  In other words, Gremlin Server is using `toString` to serialize all results back to the console.  This enables virtually any object on the server to be returned to the console, but it doesn't allow the opportunity to work with this data in any way in the console itself.  A different configuration of the `:remote` is required to get the results back as "objects":
+The `:>` command, which is a shorthand for `:submit`, sends the script to the server to execute there.  Results are wrapped in an `Result` object which is a just a holder for each individual result.  The `class` shows the data type for the containing value.  Note that the last script sent was supposed to return a `Map`, but its `class` is `java.lang.String`.  By default, the connection is configured to only return text results.  In other words, Gremlin Server is using `toString` to serialize all results back to the console.  This enables virtually any object on the server to be returned to the console, but it doesn't allow the opportunity to work with this data in any way in the console itself.  A different configuration of the `:remote` is required to get the results back as "objects":
 
 [source,groovy]
 ----
-gremlin> :remote connect server conf/remote-objects.yaml <1>
+gremlin> :remote connect tinkerpop.server conf/remote-objects.yaml <1>
 ==>connected - localhost/127.0.0.1:8182
 gremlin> :remote list <2>
 ==>0 - gremlin server - [localhost/127.0.0.1:8182]
 ==>*1 - gremlin server - [localhost/127.0.0.1:8182]
 gremlin> :> g.E().label().groupCount() <3>
-==>Item{resultItem={created=4, knows=2} class=java.util.HashMap}
-gremlin> m = _l[0].get(Map.class) <4>
+==>[created:4, knows:2]
+gremlin> m = result[0].object <4>
 ==>created=4
 ==>knows=2
 gremlin> m.sort{it.value}
 ==>knows=2
 ==>created=4
+gremlin> script = """
+                  matthias = g.addVertex('name','matthias')
+                  matthias.addEdge('co-creator',g.V().has('name','marko').next())
+                  """
+gremlin> :> @script   <5>
+==>e[14][12-co-creator->1]
+gremlin> :> g.V().has('name','matthias').out('co-creator').values('name')
+==>marko
+gremlin> :remote close
+==>removed - gremlin server - [localhost/127.0.0.1:8182]
 ----
 
 <1> This configuration file specifies that results should be deserialized back into an `Object` in the Console with the caveat being that the server and console both know how to serialize and deserialize the result to be returned.
 <2> There are now two configured remote connections.  The one marked by an asterisk is the one that was just created and denotes the current one that `:sumbit` will react to.
 <3> When the script is executed again, the `class` is no longer shown to be a `java.lang.String`.  It is instead a `java.util.HashMap`.
-<4> The last result of a remote script is always stored in the reserved variable `_l`, which allows access to the `Item` and by virtue of that, the `Map` itself.
+<4> The last result of a remote script is always stored in the reserved variable `result`, which allows access to the `Result` and by virtue of that, the `Map` itself.
+<5> If the submission requires multiple-lines to express, then a multi-line string can be created. The `:>` command realizes that the user is referencing a variable via `@` and submits the string script.
+
+TIP: In Groovy, `""" text """` is a convenient way to create a multi-line string and works well in concert with `:> @variable`. Note that this model of submitting a string variable works for all `:>` based plugins, not just Gremlin Server.
 
 Connecting via Java
 ~~~~~~~~~~~~~~~~~~~
@@ -282,7 +299,7 @@ Once a `Client` instance is ready, it is possible to issue some Gremlin:
 ResultSet results = client.submit("[1,2,3,4]");  <1>
 results.stream().map(i -> i.get(Integer.class) * 2);       <2>
 
-CompletableFuture<List<Item>> results = client.submit("[1,2,3,4]").all();  <3>
+CompletableFuture<List<Result>> results = client.submit("[1,2,3,4]").all();  <3>
 
 CompletableFuture<ResultSet> future = client.submitAsync("[1,2,3,4]"); <4>
 
@@ -296,6 +313,68 @@ client.submit("[1,2,3,x]", params); <5>
 <3> Submit a script, get a `ResultSet`, then return a `CompletableFuture` that will be called when all results have been returned.
 <4> Submit a script asynchronously without waiting for the request to be written to the server.
 <5> Parameterized request are considered the most efficient way to send Gremlin to the server as they can be cached, which will boost performance and reduce resources required on the server.
+
+
+Connecting via REST
+~~~~~~~~~~~~~~~~~~~
+
+image:gremlin-rexster.png[width=225,float=left] While the default behavior for Gremlin Server is to provide a WebSockets-based connection, it can also be configured to support link:http://en.wikipedia.org/wiki/Representational_state_transfer[REST].  The REST endpoint provides for a communication protocol familiar to most developers, with a wide support of programming languages, tools and libraries for accessing it.  As a result, REST provides a fast way to get started with Gremlin Server.   It also may represent an easier upgrade path from link:http://rexster.tinkerpop.com/[Rexster] as the API for the endpoint is very similar to Rexster's link:https://github.com/tinkerpop/rexster/wiki/Gremlin-Extension[Gremlin Extension].
+
+Gremlin Server provides for a single REST endpoint - a Gremlin evaluator - which allows the submission of a Gremlin script as a request.  For each request, it returns a response containing the serialized results of that script.  To enable this endpoint, Gremlin Server needs to be configured with the `HttpChannelizer`, which replaces the default `WebSocketChannelizer`, in the configuration file:
+
+[source,yaml]
+channelizer: com.tinkerpop.gremlin.server.channel.HttpChannelizer
+
+This setting is already configured in the `gremlin-server-rest-classic.yaml` file that is packaged with the Gremlin Server distribution.  To utilize it, start Gremlin Server as follows:
+
+[source,text]
+bin/gremlin-server.sh conf/gremlin-server-rest-classic.yaml
+
+Once the server has started, issue a request.  Here's an example with link:http://curl.haxx.se/[cURL]:
+
+[source,text]
+$ curl "http://localhost:8182?gremlin=100-1"
+
+which returns:
+
+[source,js]
+{
+  "result":{"data":99,"meta":{}},
+  "requestId":"0581cdba-b152-45c4-80fa-3d36a6eecf1c",
+  "status":{"code":200,"attributes":{},"message":""}
+}
+
+The above example showed a `GET` operation, but the preferred method for this endpoint is `POST`:
+
+[source,text]
+curl -X POST -d "{\"gremlin\":\"100-1\"}" "http://localhost:8182"
+
+which returns:
+
+[source,js]
+{
+  "result":{"data":99,"meta":{}},
+  "requestId":"ef2fe16c-441d-4e13-9ddb-3c7b5dfb10ba",
+  "status":{"code":200,"attributes":{},"message":""}
+}
+
+It is also preferred that Gremlin scripts be parameterized when possible via `bindings`:
+
+[source,text]
+curl -X POST -d "{\"gremlin\":\"100-x\", \"bindings\":{\"x\":1}}" "http://localhost:8182"
+
+The `bindings` argument is a `Map` of variables where the keys become available as variables in the Gremlin script.  Note that parameterization of requests is critical to performance, as repeated script compilation can be avoided on each request.
+
+NOTE: It is possible to pass bindings via `GET` based requests.  All query string arguments besides the "gremlin" key containing the script to execute will be treated as bindings.  The caveat is that these arguments will always be treated as `String` values.  To ensure that data types are preserved or to pass complex objects such as lists or maps, use `POST` which will at least support the allowed JSON data types.
+
+Finally, as Gremlin Server can host multiple `ScriptEngine` instances (e.g. `gremlin-groovy`, `nashorn`), it is possible to define the language to utilize to process the request:
+
+[source,text]
+curl -X POST -d "{\"gremlin\":\"100-x\", \"language\":\"gremlin-groovy\", \"bindings\":{\"x\":1}}" "http://localhost:8182"
+
+By default this value is set to `gremlin-groovy`.  If using a `GET` operation, this value can be set as a query string argument with by setting the `language` key.
+
+CAUTION: Consider the size of the result of a submitted script being returned from the REST endpoint.  A script that iterates thousands of results will serialize each of those in memory into a single JSON result set.  It is quite possible that such a script will generate `OutOfMemoryError` exceptions on the server.  Consider the default WebSockets configuration, which supports streaming, if that type of use case is required.
 
 Configuring
 ~~~~~~~~~~~
@@ -314,6 +393,8 @@ The `gremlin-server.sh` file also serves a second purpose.  It can be used to "i
 bin/gremlin-server.sh -i com.tinkerpop neo4j-gremlin x.y.z
 ----
 
+WARNING: As of `neo4j-gremlin x.y.z` there is a bug concerning how `ext/neo4j-gremlin` jars are loaded. The seemingly crazy workaround is to rename `ext/neo4j-gremlin/neo4j-lucene-index-2.1.4.jar` to `ext/neo4j-gremlin/a.jar`. We are unsure why this happens, but found that to work or to move the `neo4j-lucene-index-2.1.4.jar` to the `lib/` directory.
+
 This command will "grab" the appropriate dependencies and copy them to the `ext` directory of Gremlin Server, which will then allow them to be "used" the next time the server is started.  To uninstall dependencies, simply delete them from the `ext` directory.
 
 The following table describes the various configuration options that Gremlin Server expects:
@@ -321,7 +402,7 @@ The following table describes the various configuration options that Gremlin Ser
 [width="100%",cols="3,10,^2",options="header"]
 |=========================================================
 |Key |Description |Default
-|channelizer |Defines the `Channelizer` implementation to use.  A `Channelizer` is a "channel initializer" which Gremlin Server uses to define the type of processing pipeline to use.  By allowing different `Channelizer` implementations, Gremlin Server can support different communication protocols (e.g. Websockets, Java NIO, etc.). |WebSocketChannelizer
+|channelizer |Defines the `Channelizer` implementation to use.  A `Channelizer` is a "channel initializer" which Gremlin Server uses to define the type of processing pipeline to use.  By allowing different `Channelizer` implementations, Gremlin Server can support different communication protocols (e.g. Websockets, Java NIO, etc.). |WebSocketChannelizer,HttpChannelizer
 |graphs |A `Map` of `Graph` configuration files where the key of the `Map` becomes the name to which the `Graph` will be bound and the value is the file name of a `Graph` configuration file. |_none_
 |gremlinPool |The number of "Gremlin" threads available to execute actual scripts in a `ScriptEngine`. This pool represents the workers available to handle blocking operations in Gremlin Server. |8
 |host |The name of the host to bind the server to. |localhost
@@ -625,7 +706,7 @@ To visualize it insert the appropriately named `store('n')` steps where `n` is a
 
 [source,groovy]
 gremlin> g.v(2).in('knows').out('knows').has('age',gt,30).
-               outE('created').has('weight',gt,0.5f).inV().value('name')
+               outE('created').has('weight',gt,0.5f).inV().values('name')
 ==>ripple
 gremlin> traversal = g.v(2).store('1').
                            in('knows').store('2').
@@ -703,7 +784,7 @@ IMPORTANT: It is important that the sugar plugin is loaded in a Gremlin Console 
 [source,groovy]
 gremlin> :plugin use tinkerpop.sugar
 ==>tinkerpop.sugar activated
-gremlin> g.v(1).value('name')  // conventional 
+gremlin> g.v(1).values('name')  // conventional
 ==>marko
 gremlin> g.v(1).name  // sugar
 ==>marko
@@ -724,10 +805,10 @@ gremlin> g.V.map{it.name}  // sugar
 
 The examples above are generalized below:
 
-. Missing element fields: if a vertex or edge's instance field is selected and that field does not exist, then it is assumed the user means `value('fieldName')`.
+. Missing element fields: if a vertex or edge's instance field is selected and that field does not exist, then it is assumed the user means `values('fieldName')`.
 . Missing traverser method: if a traverser method is called and that method doesn't exist, then it is assumed that the method is on the wrapped object of the traverser.
 . Missing traverser field: if a traverser field is called and that field doesn't exist, then it is assumed that the field is on the wrapped object of the traverser.
-. Missing traversal field: if a traversal field is called and that field doesn't exist, then it is assumed either a step() or defaults to `value('step')`.
+. Missing traversal field: if a traversal field is called and that field doesn't exist, then it is assumed either a step() or defaults to `values('step')`.
 
 [[utilities-plugin]]
 Utilities Plugin
@@ -769,7 +850,7 @@ gremlin> :plugin use tinkerpop.sugar // activate sugar plugin for use in benchma
 ==>tinkerpop.sugar activated
 gremlin> benchmark{ 
 gremlin>   'sugar' {g.v(1).name.next()}
-gremlin>   'nosugar' {g.v(1).value('name').next()}}.prettyPrint()
+gremlin>   'nosugar' {g.v(1).values('name').next()}}.prettyPrint()
 Environment
 ===========
 * Groovy: 2.3.6
